@@ -10,7 +10,7 @@ A Blender addon to streamline importing and configuring Warframe models/material
 - **Material Setup**: Auto-configure materials using .txt material files
 
 ## Installation
-1. Download latest release
+1. Download latest release/Download warframe-auto-porter.py
 2. In Blender (`Edit > Preferences > Add-ons`):
    - Click *Install from disk...* and select the downloaded file
    - Enable the "Warframe Auto Porter" addon
