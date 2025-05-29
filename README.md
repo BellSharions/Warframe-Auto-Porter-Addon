@@ -8,9 +8,10 @@ A Blender addon to streamline importing and configuring Warframe models/material
 - **Model Import**: Import GLB models with optimized settings
 - **Shader Management**: Append shaders from .blend files
 - **Material Setup**: Auto-configure materials using .txt material files
+- **Rigging**: Character rig setup 
 
 ## Installation
-1. Download latest release/Download warframe-auto-porter.py
+1. Download latest release
 2. In Blender (`Edit > Preferences > Add-ons`):
    - Click *Install from disk...* and select the downloaded file
    - Enable the "Warframe Auto Porter" addon
@@ -31,6 +32,8 @@ Access from the right-side toolbar in 3D View (`N` panel > Tool tab).
    - Auto-link textures from either:
      - Root folder structure
      - Custom texture folder
+- **Rig Setup Mode**:
+   - Configure rig from .blend file
 
 ## Configuration
 
@@ -54,6 +57,7 @@ Access from the right-side toolbar in 3D View (`N` panel > Tool tab).
 | **Material File** | File | `D:/ExtractedAssets/Lotus/Objects/Duviri/Props/DominitiusThraxThroneA.txt` | Warframe material TXT file |
 | **Model File** | File | `D:/ExtractedAssets/Lotus/Objects/Duviri/Props/DUVxThraxThrone.glb` | Model file to import (GLB format) |
 | **Shader Library** | File | `D:/Downloads/PBRFillDeferred.blend` | Blend file containing shader materials |
+| **Rig File** | File | `D:/Downloads/WF_Rig.blend` | Blend file containing necessary rigs and scripts |
 | **Textures Folder** | Directory | `D:/Textures` | Custom folder for textures (if not using root) |
 
 ---
@@ -151,6 +155,26 @@ Click *Run Setup* → Addon will:
 3. **Append Material**  
    Click *Run Setup* → File browser appears  
    Select material matching your needs. Read README file inside .blend shader files to know which one you need.
+---
+
+### 4. Rig configuring Workflow
+*For setting up rigs*
+
+**Typical Use Case:**  
+- Rigging a character using a prepared rig file
+
+**Steps:**
+1. **Mode Selection**  
+   Change *Mode* to **RIGGING**
+
+2. **Rig File Path**  
+   Set *Rig File* to `.blend` file location:  
+   `D:/Downloads/WF_Rig.blend`
+3. **Select required objects**
+   Select the body, head, cloths, other things you need using Shift + Click. Don't select any armatures, only meshes themselves. Make sure you've selected everything, even eyes of characters that have them.
+4. **Append Rig**  
+   Click *Run Setup* → File browser appears -> Select required file if using file viewer  
+   Select rig matching your needs. Read README file inside .blend file to know which one you need. Warframes usually need Basic rig, characters with face need Face rig, etc.
 
 ---
 
@@ -170,11 +194,17 @@ Click *Run Setup* → Addon will:
    - Switch *Mode* to **SHADER**  
    - Configure paths/texture format if not using automatic paths
    - Click *Run Setup* -> Select material file and Extracted Root Folder if using automatic paths
+   - 
+4. **Stage 4 - Rig Setup**  
+   - Switch *Mode* to **RIGGING**  
+   - Configure path if not using automatic paths
+   - Click *Run Setup* -> Select rig file if using automatic paths -> Select rig to append
 
 ---
 ## Troubleshooting
 - **Missing Textures**: Verify paths in material TXT file match texture locations
 - **Material Issues**: Double-check shader parameters in TXT file
+- **Rig issues**: Double check you've selected required objects, read list of known issues, make sure you're setting up 1 character per blend file.
 - **Something else**: Check Console (`Window > Toggle System Console`) for details
 
 ## Support

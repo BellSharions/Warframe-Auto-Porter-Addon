@@ -1,0 +1,13 @@
+schema_version = "1.0.0"
+id = "warframe_auto_porter"
+version = "0.42.0"
+name = "Warframe Auto Porter Addon"
+module = "warframe_auto_porter"
+tagline = "Imports and configures Warframe models/materials"
+type = "add-on"
+license = ["SPDX:GPL-2.0-or-later"]
+maintainer = "Bell Sharions"
+description = "Imports and configures Warframe models/materials"
+blender_version_min = "4.1.0"
+category = "Import"
+location = "3D View > Tool Shelf (Right Panel)"

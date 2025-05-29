@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Warframe Auto Porter",
     "author": "Bell Sharions",
-    "version": (0, 40),
+    "version": (0, 42),
     "blender": (4, 2, 0),
     "location": "3D View > Tool Shelf (Right Panel)",
     "description": "Imports and configures Warframe models/materials",
@@ -44,7 +44,7 @@ model_file_path = Path(r"D:\tmp\Assets\Lotus\Objects\Duviri\Props\DUVxDominitius
 # pathToShader - Set this if you use SHADER_APPEND_MODE. 
 # Assign it to .blend file of where the materials that need to be appended are. Example is for PBRFillDeferred
 pathToShader = r"E:\Download\PBRFillDeferred(5).blend"
-
+pathToRig = r""
 # Model Setup
 # This section is about model setup. If you just want to setup shader itself - turn both options off
 # IMPORT_MODEL_MODE - Set this if you only want to import the model with the correct settings 
@@ -53,6 +53,7 @@ IMPORT_MODEL_MODE = False
 # SHADER_APPEND_MODE - Set this to append the shader and assign it to the selected object automatically.
 # If set to True THIS WILL NOT RUN THE SHADER SETUP.
 SHADER_APPEND_MODE = False
+RIG_MODE = False
 
 # Shader Setup
 # Method 1 - Copy all the textures from the material TXT file txt in a separate folder and copy the path to pathToTextures
@@ -121,8 +122,6 @@ def set_default(input_socket, value):
     if input_socket.type == 'VECTOR':
         input_socket.default_value = tuple(value[:3])
     elif input_socket.type == 'BOOLEAN':
-        print(input_socket.name)
-        print(value)
         input_socket.default_value = bool(strtobool(value))
     elif input_socket.type == 'COLOR':
         input_socket.default_value = tuple(value[:3])
@@ -136,9 +135,9 @@ def reset_default(input_socket):
     elif input_socket.type == 'BOOLEAN':
         input_socket.default_value = False
     elif input_socket.type == 'COLOR':
-        input_socket.default_value = tuple([0, 0, 0])
+        input_socket.default_value = tuple([0.5, 0.5, 0.5])
     elif input_socket.type == 'RGBA':
-        input_socket.default_value = tuple([0, 0, 0, 0])
+        input_socket.default_value = tuple([0.5, 0.5, 0.5, 1])
     elif input_socket.type == 'VALUE':
         input_socket.default_value = float(0)
                 
@@ -347,6 +346,17 @@ def get_shader_items(self, context):
             items.append((mat_name, mat_name, ""))
     return items
 
+def get_rig_items(self, context):
+    items = []
+    if not os.path.exists(pathToRig):
+        return items
+    with bpy.data.libraries.load(pathToRig, link=False) as (data_from, data_to):
+        for rig_name in data_from.collections:
+            print(rig_name)
+            if "meta" not in rig_name.lower() and "wgts" not in rig_name.lower():
+                items.append((rig_name, rig_name, ""))
+    return items
+
 class SHADER_OT_append_material(bpy.types.Operator):
     bl_idname = "shader.append_material"
     bl_label = "Append Shader"
@@ -377,9 +387,9 @@ class SHADER_OT_append_material(bpy.types.Operator):
                 
                 if new_material:
                     if obj.data.materials and obj.data.materials[0] is not None:
-                            original_name = obj.data.materials[0].name
-                            new_material.name = original_name 
-                            obj.data.materials[0] = new_material
+                        original_name = obj.data.materials[0].name
+                        new_material.name = original_name 
+                        obj.data.materials[0] = new_material
                     else:
                         new_name = f"{obj.data.name}_Material"
                         new_material.name = new_name
@@ -404,6 +414,120 @@ class SHADER_OT_append_material(bpy.types.Operator):
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self, width=300)
 
+class RIG_OT_append_rig(bpy.types.Operator):
+    bl_idname = "rig.append_rig"
+    bl_label = "Append Rig"
+    bl_description = "Append rig and do automatic setup"
+    bl_property = "rig_name"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    rig_name: bpy.props.EnumProperty(
+        name="Rigs",
+        description="Available rigs",
+        items=get_rig_items,
+    )
+
+    def execute(self, context):
+        if not self.rig_name:
+            return {'CANCELLED'}
+        original_selection = context.selected_objects
+        original_active = context.active_object
+        selected = context.selected_objects
+        bpy.ops.wm.append(
+            directory=os.path.join(pathToRig, "Collection") + os.sep,
+            filename=self.rig_name
+        )
+        bpy.ops.wm.append(
+            directory=os.path.join(pathToRig, "Text") + os.sep,
+            filename="Bones Snap"
+        )
+        self.report({'INFO'}, f"Appended material: {self.rig_name}")
+        obj = bpy.context.object
+        new_rig_collection  = bpy.data.collections.get(self.rig_name)
+        if new_rig_collection.name not in context.scene.collection.children:
+            bpy.context.scene.collection.children.link(new_rig_collection)
+        else:
+            print("Failed to append material")
+        target_armature = None
+        for obj in new_rig_collection.objects:
+            print(obj.name)
+            if obj.type == 'ARMATURE' and obj.name.lower() in self.rig_name.lower():
+                target_armature = obj
+                break
+
+        if not target_armature:
+            self.report({'ERROR'}, f"Armature '{self.rig_name}' not found in collection")
+            return {'CANCELLED'}
+        updated_count = 0
+        old_armatures = set()
+        for obj in selected:
+            print(obj)
+            for mod in obj.modifiers:
+                if mod.type == 'ARMATURE':
+                    if mod.object != target_armature:
+                        old_armatures.add(mod.object)
+                        mod.object = target_armature
+                        updated_count += 1
+        special_rigs = {"face rig": ["Face Metarig", "MetaRig"], "long arm rig": ["Long Arm Metarig", "Long Arm Metarig"]}
+        for sprig in special_rigs:
+            if sprig in self.rig_name.lower() and old_armatures:
+                face_meta_rig = None
+                face_meta_rig = bpy.data.objects.get(special_rigs[sprig][0])
+                
+                if not face_meta_rig:
+                    self.report({'WARNING'}, "Face MetaRig not found in appended collection")
+                else:
+                    snap_script = bpy.data.texts.get("Bones Snap")
+                    if snap_script:
+                        print(special_rigs[sprig][1])
+                        metacol = bpy.data.collections.get(special_rigs[sprig][1])
+                        print(metacol)
+                        metacol.hide_viewport = False
+                        bpy.ops.object.select_all(action='DESELECT')
+                        face_meta_rig.hide_set(False)
+                        face_meta_rig.hide_viewport = False
+                        face_meta_rig.hide_select = False
+                        face_meta_rig.select_set(True)
+                        context.view_layer.objects.active = face_meta_rig
+                        for old_arm in old_armatures:
+                            old_arm.select_set(True)
+                            context.view_layer.objects.active = old_arm
+                            break
+                        try:
+                            ctx = {
+                                'bpy': bpy,
+                                'context': context,
+                                'selected_objects': context.selected_objects,
+                                'active_object': context.active_object
+                            }
+                            exec(snap_script.as_string(), ctx)
+                        except Exception as e:
+                            metacol.hide_viewport = True
+                            self.report({'ERROR'}, f"Bone Snap failed: {str(e)}")
+                        bpy.ops.object.select_all(action='DESELECT')
+                        face_meta_rig.select_set(True)
+                        context.view_layer.objects.active = face_meta_rig
+                        try:
+                            bpy.ops.pose.rigify_generate()
+                        except Exception as e:
+                            metacol.hide_viewport = True
+                            self.report({'ERROR'}, f"Rigify generation failed: {str(e)}")
+                            return {'CANCELLED'}
+                        metacol.hide_viewport = True
+                    else:
+                        self.report({'WARNING'}, "Bones Snap script not found")
+        return {'FINISHED'}
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Select Rig to Append")
+        layout.prop(self, "rig_name", text="")
+        layout.separator()
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=300)
+
+
 def menu_func(self, context):
     self.layout.operator(SHADER_OT_append_material.bl_idname)
 
@@ -412,6 +536,11 @@ def register_shader():
 
 def unregister_shader():
     bpy.utils.unregister_class(SHADER_OT_append_material)
+def register_rig():
+    bpy.ops.rig.append_rig('INVOKE_DEFAULT')
+
+def unregister_rig():
+    bpy.utils.unregister_class(RIG_OT_append_rig)
 
 
 def process_object(obj):
@@ -430,7 +559,7 @@ def process_object(obj):
 
 def run_setup():
     if IS_ADDON:
-        global model_path, USE_ROOT_LOCATION, EMPTY_IMAGES_BEFORE_SETUP, REPLACE_IMAGES, RESET_PARAMETERS, texture_extension, USE_PATHS, material_file_path, model_file_path, pathToShader, pathToTextures, root
+        global model_path, USE_ROOT_LOCATION, RIG_MODE, EMPTY_IMAGES_BEFORE_SETUP, REPLACE_IMAGES, RESET_PARAMETERS, texture_extension, USE_PATHS, material_file_path, model_file_path, pathToShader, pathToRig, pathToTextures, root
         model_path = bpy.context.scene.warframe_tools_props.model_path
         USE_ROOT_LOCATION = bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION
         EMPTY_IMAGES_BEFORE_SETUP = bpy.context.scene.warframe_tools_props.EMPTY_IMAGES_BEFORE_SETUP
@@ -442,6 +571,7 @@ def run_setup():
             material_file_path = bpy.context.scene.warframe_tools_props.material_file_path
             model_file_path = bpy.context.scene.warframe_tools_props.model_file_path
             pathToShader = bpy.context.scene.warframe_tools_props.pathToShader
+            pathToRig = bpy.context.scene.warframe_tools_props.rig_path
         if not USE_ROOT_LOCATION and not USE_PATHS:
             pathToTextures = bpy.context.scene.warframe_tools_props.pathToTextures
         if USE_ROOT_LOCATION and not USE_PATHS:
@@ -451,7 +581,7 @@ def run_setup():
             filepath=str(model_file_path), 
             guess_original_bind_pose=False, 
             bone_heuristic="TEMPERANCE")
-
+        
         for obj in bpy.context.selected_objects:
             if obj.type != 'MESH':
                 continue
@@ -461,6 +591,8 @@ def run_setup():
             print(obj.data.validate(clean_customdata=True))
     elif SHADER_APPEND_MODE:
         register_shader()
+    elif RIG_MODE:
+        register_rig()
     else:
         mat = bpy.context.object.active_material
         if not mat:
@@ -479,6 +611,7 @@ class WM_OT_SetupPaths(bpy.types.Operator):
     material_file_path: bpy.props.StringProperty(subtype='FILE_PATH')
     model_file_path: bpy.props.StringProperty(subtype='FILE_PATH')
     pathToShader: bpy.props.StringProperty(subtype='FILE_PATH')
+    pathToRig: bpy.props.StringProperty(subtype='FILE_PATH')
     root: bpy.props.StringProperty(subtype='DIR_PATH')
     pathToTextures: bpy.props.StringProperty(subtype='DIR_PATH')
     
@@ -499,11 +632,14 @@ class WM_OT_SetupPaths(bpy.types.Operator):
             steps.append(('model_file_path', 'Select Model File (.glb)', 'file', '*.glb'))
         elif SHADER_APPEND_MODE:
             steps.append(('pathToShader', 'Select Shader Blend File', 'file', '*.blend'))
+        elif RIG_MODE:
+            steps.append(('pathToRig', 'Select Rig Blend File', 'file', '*.blend'))
         else:
             steps.append(('material_file_path', 'Select Material File (.txt)', 'file', '*.txt'))
-            if USE_ROOT_LOCATION:
+            self.root = bpy.context.scene.warframe_tools_props.root
+            if USE_ROOT_LOCATION and (self.root is None or self.root is ""):
                 steps.append(('root', 'Select Root Directory', 'directory', ''))
-            else:
+            elif not USE_ROOT_LOCATION:
                 steps.append(('pathToTextures', 'Select Textures Directory', 'directory', ''))
         return steps
 
@@ -518,11 +654,13 @@ class WM_OT_SetupPaths(bpy.types.Operator):
 
     def execute(self, context):
         if self.current_step >= len(self.steps):
-            global material_file_path, model_file_path, pathToShader, root, pathToTextures
+            global material_file_path, model_file_path, pathToShader, pathToRig, root, pathToTextures
             if self.material_file_path:
                 material_file_path = Path(self.material_file_path)
             if self.model_file_path:
                 model_file_path = Path(self.model_file_path)
+            if self.pathToRig:
+                pathToRig = self.pathToRig
             if self.pathToShader:
                 pathToShader = self.pathToShader
             if self.root:
@@ -593,6 +731,10 @@ if IS_ADDON:
             name="Extracted Root Folder Path",
             subtype='FILE_PATH'
         )
+        rig_preference: StringProperty(
+            name="Rig Blend Path",
+            subtype='FILE_PATH'
+        )
         texture_extension_preference: EnumProperty(
             name="Texture Extension",
             description="Choose the texture file extension",
@@ -609,6 +751,8 @@ if IS_ADDON:
             layout.label(text="Path to the folder where Lotus, EE, DOS, SF and other folders are located.")
             layout.label(text=r"DO NOT CHOOSE LOTUS FOLDER (example, D:\tmp\Assets)")
             layout.prop(self, "root_preference")
+            layout.label(text=r"Path to the rig blend file (example, D:\Downloads\WF_Rig.blend)")
+            layout.prop(self, "rig_preference")
             layout.label(text="Default extracted texture extension.")
             layout.prop(self, "texture_extension_preference")
     def get_root_value(self):
@@ -616,7 +760,13 @@ if IS_ADDON:
 
     def set_root_value(self, value):
         bpy.context.preferences.addons[__name__].preferences.root_preference = value  
-            
+        
+    def get_rig_value(self):
+        return bpy.context.preferences.addons[__name__].preferences.rig_preference
+
+    def set_rig_value(self, value):
+        bpy.context.preferences.addons[__name__].preferences.rig_preference = value  
+                
     def get_ext_value(self):
         val = bpy.context.preferences.addons[__name__].preferences.texture_extension_preference
         data = [
@@ -648,10 +798,9 @@ if IS_ADDON:
     
     class WarframeAddonProperties(bpy.types.PropertyGroup):
         def update_ui(self, context):
-            if context and not context.area.as_pointer() == context.window_manager.filebrowser.as_pointer():
-                for area in context.screen.areas:
-                    if area.type == 'VIEW_3D':
-                        area.tag_redraw()
+            for area in context.screen.areas:
+                if area.type == 'VIEW_3D':
+                    area.tag_redraw()
 
         model_path: StringProperty(
         name="Internal Path",
@@ -682,7 +831,7 @@ if IS_ADDON:
     )
         RESET_PARAMETERS: BoolProperty(
         name="Reset Parameters",
-        description="Sets values that do not exist in the mat txt file to 0, black, etc. DO NOT USE UNLESS YOU KNOW WHAT YOU'RE DOING",
+        description="Sets values that do not exist in the mat txt file to 0, gray, etc. Useful if there are parameters that a set to true but don't exist in your mat file",
         default=False
     )
         texture_extension: EnumProperty(
@@ -726,6 +875,13 @@ if IS_ADDON:
         subtype='FILE_PATH',
         get=get_root_value,
         set=set_root_value
+    )    
+        rig_path: StringProperty(
+        name="Rig Blend Path",
+        description=r"Path to the .blend path (e.g., D:\Download\WFRig.blend",
+        subtype='FILE_PATH',
+        get=get_rig_value,
+        set=set_rig_value
     )
         mode: EnumProperty(
         name="Mode",
@@ -733,6 +889,7 @@ if IS_ADDON:
             ('IMPORT', "Import Model Mode", "Import the model from a file"),
             ('APPEND', "Shader Append Mode", "Append the shader from a blend file"),
             ('SHADER', "Shader Setup Mode", "Set up the shader parameters and textures"),
+            ('RIG', "Rig Setup Mode", "Set up the rig for characters"),
         ],
         default='SHADER',
         update=update_ui
@@ -752,17 +909,24 @@ if IS_ADDON:
             layout = self.layout
             scene = context.scene
             props = scene.warframe_tools_props
-            global IMPORT_MODEL_MODE, SHADER_APPEND_MODE, USE_PATHS
+            global IMPORT_MODEL_MODE, SHADER_APPEND_MODE, RIG_MODE, USE_PATHS
             if IS_ADDON:
                 USE_PATHS = props.USE_PATHS
             if props.mode == 'IMPORT':
                 IMPORT_MODEL_MODE = True
                 SHADER_APPEND_MODE = False
+                RIG_MODE = False
             elif props.mode == 'APPEND':
                 IMPORT_MODEL_MODE = False
                 SHADER_APPEND_MODE = True
+                RIG_MODE = False
+            elif props.mode == 'RIG':
+                IMPORT_MODEL_MODE = False
+                SHADER_APPEND_MODE = False
+                RIG_MODE = True
             else:
                 IMPORT_MODEL_MODE = False
+                RIG_MODE = False
                 SHADER_APPEND_MODE = False
             box = layout.box()
             box.label(text="Configuration")
@@ -779,7 +943,12 @@ if IS_ADDON:
                     box.prop(props, "pathToShader")
                 layout.operator("wm.run_setup", text="Append Shader")
                 return
-            if not (IMPORT_MODEL_MODE or SHADER_APPEND_MODE):
+            if RIG_MODE:
+                if not props.USE_PATHS: 
+                    box.prop(props, "rig_path")
+                layout.operator("wm.run_setup", text="Setup Rig")
+                return
+            if not (IMPORT_MODEL_MODE or SHADER_APPEND_MODE or RIG_MODE):
                 box.prop(props, "model_path")
                 if not props.USE_PATHS: 
                     box.prop(props, "material_file_path")
@@ -804,12 +973,19 @@ if IS_ADDON:
             if mode == 'IMPORT':
                 IMPORT_MODEL_MODE = True
                 SHADER_APPEND_MODE = False
+                RIG_MODE = False
             elif mode == 'APPEND':
                 IMPORT_MODEL_MODE = False
                 SHADER_APPEND_MODE = True
+                RIG_MODE = False
+            elif mode == 'RIG':
+                IMPORT_MODEL_MODE = False
+                SHADER_APPEND_MODE = False
+                RIG_MODE = True
             else:
                 IMPORT_MODEL_MODE = False
                 SHADER_APPEND_MODE = False
+                RIG_MODE = False
 
             if USE_PATHS:
                 bpy.ops.wm.setup_paths('INVOKE_DEFAULT')
@@ -823,6 +999,7 @@ def register():
     bpy.utils.register_class(WM_OT_RunSetup)
     bpy.utils.register_class(WM_OT_SetupPaths)
     bpy.utils.register_class(SHADER_OT_append_material)
+    bpy.utils.register_class(RIG_OT_append_rig)
     bpy.utils.register_class(WarframeAddonProperties)
     bpy.types.Scene.warframe_tools_props = PointerProperty(type=WarframeAddonProperties)
     bpy.context.preferences.use_preferences_save = True
@@ -832,6 +1009,7 @@ def unregister():
     bpy.utils.unregister_class(WM_OT_RunSetup)
     bpy.utils.unregister_class(WM_OT_SetupPaths)
     bpy.utils.unregister_class(SHADER_OT_append_material)
+    bpy.utils.unregister_class(RIG_OT_append_rig)
     bpy.utils.unregister_class(WarframeAddonProperties) 
     bpy.utils.unregister_class(WarframeAutoPorter)  
     del bpy.types.Scene.warframe_tools_props
