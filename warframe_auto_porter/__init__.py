@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Warframe Auto Porter",
     "author": "Bell Sharions",
-    "version": (0, 42),
+    "version": (0, 43),
     "blender": (4, 2, 0),
     "location": "3D View > Tool Shelf (Right Panel)",
     "description": "Imports and configures Warframe models/materials",
@@ -55,6 +55,26 @@ IMPORT_MODEL_MODE = False
 SHADER_APPEND_MODE = False
 RIG_MODE = False
 
+BAKE_MODE = False
+SOURCE = "Emission"
+IMAGE_NAME = "Baked_Texture"
+IMAGE_SIZE = (2048, 2048)
+MARGIN = 3
+SAMPLES = 1
+COLOR_SPACE_MAP = {
+    'Base Color': 'sRGB',
+    'Emission': 'sRGB',
+    'Metalness': 'Non-Color',
+    'Roughness': 'Non-Color',
+    'Specular': 'Non-Color',
+    'Normal': 'Non-Color'
+}
+UV_SOURCE_SELECTION = 0
+EMISSION_FLAGS_FOR_BAKING = ["emission_mask", "multi_tint_and_mask", "emissive_mask"]
+
+baking_queue = []
+current_job = None
+
 # Shader Setup
 # Method 1 - Copy all the textures from the material TXT file txt in a separate folder and copy the path to pathToTextures
 # pathToTextures - Set this to the path of where ALL the textures from material TXT file are if USE_ROOT_LOCATION is False
@@ -95,8 +115,9 @@ import os
 import ast
 import bmesh
 from fnmatch import fnmatch
-from bpy.types import Operator, AddonPreferences
-from bpy.props import StringProperty, BoolProperty, PointerProperty, EnumProperty
+from bpy.types import Operator, AddonPreferences, Macro, PropertyGroup
+from bpy.props import StringProperty, BoolProperty, PointerProperty, EnumProperty, IntProperty
+from bpy.app.handlers import persistent
 labeled_reroutes = []
 texture_locations =[]
 
@@ -109,6 +130,21 @@ def strtobool (val):
         return False
     else:
         return False
+
+def get_color_space(source):
+    """Determine color space based on source name"""
+    # Try exact match first
+    if source in COLOR_SPACE_MAP:
+        return COLOR_SPACE_MAP[source]
+    
+    # Try case-insensitive match
+    source_lower = source.lower()
+    for key in COLOR_SPACE_MAP:
+        if key.lower() in source_lower:
+            return COLOR_SPACE_MAP[key]
+    
+    # Default to sRGB if no match found
+    return 'sRGB'
 
 
 def contains(str1, str2):
@@ -357,6 +393,175 @@ def get_rig_items(self, context):
                 items.append((rig_name, rig_name, ""))
     return items
 
+class BakeState:
+    """Storage for bake operation state"""
+    def __init__(self, material, output_node, orig_socket, image_node, source_socket):
+        self.material = material
+        self.output_node = output_node
+        self.orig_socket = orig_socket
+        self.image_node = image_node
+        self.source_socket = source_socket
+
+def setup_bake(context, source):
+    """Prepare baking for a specific source"""
+    material = context.active_object.active_material
+    node_tree = material.node_tree
+    
+    output_node = next((n for n in node_tree.nodes if n.type == 'OUTPUT_MATERIAL'), None)
+    if not output_node:
+        raise Exception("Material Output node not found")
+    orig_socket = None
+    if output_node.inputs['Surface'].is_linked:
+        orig_socket = output_node.inputs['Surface'].links[0].from_socket
+    source_socket = None
+    fallback_socket = None
+    for node in node_tree.nodes:
+        if node.type in {'GROUP', 'GROUP_OUTPUT'}:
+            for output in node.outputs:
+                if source in output.name:
+                    fallback_socket = output
+                    if source == "Normal" and "final" in getattr(node.node_tree, 'name', '').lower():
+                        continue
+                    source_socket = output
+                    break
+            if source == "Emission":
+                for input in node.inputs:
+                    if input.name.lower() in EMISSION_FLAGS_FOR_BAKING:
+                        input.default_value = False
+                        break
+        if source_socket:
+            break
+            
+    if not source_socket and fallback_socket:
+        source_socket = fallback_socket
+    if not source_socket:
+        raise Exception(f"Output socket '{source}' not found")
+
+    image_name = f"{IMAGE_NAME}_{source.replace(' ', '_')}"
+    image = bpy.data.images.new(image_name, *IMAGE_SIZE)
+    image.colorspace_settings.name = get_color_space(source)
+    
+    image_node = node_tree.nodes.new('ShaderNodeTexImage')
+    image_node.image = image
+    image_node.location = (output_node.location.x - 300, output_node.location.y + 500)
+    
+    if output_node.inputs['Surface'].is_linked:
+        for link in output_node.inputs['Surface'].links:
+            node_tree.links.remove(link)
+    node_tree.links.new(source_socket, output_node.inputs['Surface'])
+    
+    context.scene.render.bake.margin = MARGIN
+    context.scene.render.bake.use_clear = False
+    context.scene.cycles.bake_type = 'EMIT'
+    node_tree.nodes.active = image_node
+    
+    return BakeState(material, output_node, orig_socket, image_node, source_socket)
+
+def cleanup_bake(state):
+    """Restore original node connections after baking"""
+    if not state or not state.material:
+        return
+        
+    node_tree = state.material.node_tree
+    if not node_tree:
+        return
+        
+    output_surface = state.output_node.inputs['Surface']
+    
+    if output_surface.is_linked:
+        for link in output_surface.links[:]:
+            if link.from_socket == state.source_socket:
+                node_tree.links.remove(link)
+                break
+            
+    if state.orig_socket:
+        try:
+            if not output_surface.is_linked:
+                node_tree.links.new(state.orig_socket, output_surface)
+        except Exception as e:
+            print(f"Error restoring connection: {e}")
+
+class OBJECT_OT_BakeTextures(bpy.types.Operator):
+    bl_idname = "object.bake_textures"
+    bl_label = "Bake Textures"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    source: bpy.props.StringProperty(name="Source", default="Base Color")
+
+    def execute(self, context):
+        context.scene.render.engine = 'CYCLES'
+        context.scene.cycles.samples = SAMPLES
+        
+        prefs = context.preferences
+        if prefs.addons.get('cycles'):
+            cprefs = prefs.addons['cycles'].preferences
+            if hasattr(cprefs, 'devices') and any(device.type == 'CUDA' for device in cprefs.devices):
+                context.scene.cycles.device = 'GPU'
+
+        if self.source == "All":
+            self.sources = ['Base Color', 'Emission', 'Metalness', 
+                           'Roughness', 'Specular', 'Normal']
+        else:
+            self.sources = [self.source]
+
+        self.current_index = -1
+        self.bake_state = None
+        self.baking = False
+        
+        context.window_manager.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if not self.sources:
+            return {'FINISHED'}
+            
+        if self.current_index < 0:
+            self.current_index = 0
+            self.start_next_bake(context)
+            return {'RUNNING_MODAL'}
+        
+        if self.baking:
+            if bpy.app.is_job_running('OBJECT_BAKE'):
+                return {'PASS_THROUGH'}
+                
+            cleanup_bake(self.bake_state)
+            print(f"Baked {self.sources[self.current_index]} complete!")
+            self.current_index += 1
+            self.baking = False
+            
+        if self.current_index < len(self.sources):
+            self.start_next_bake(context)
+            return {'RUNNING_MODAL'}
+        
+        return {'FINISHED'}
+
+    def start_next_bake(self, context):
+        source = self.sources[self.current_index]
+        print(f"Starting bake: {source}")
+        
+        try:
+            self.bake_state = setup_bake(context, source)
+            bpy.ops.object.bake('INVOKE_DEFAULT', type='EMIT')
+            self.baking = True
+        except Exception as e:
+            self.report({'ERROR'}, f"Bake failed: {str(e)}")
+            self.current_index = len(self.sources)
+
+def get_color_space(source):
+    """Determine color space based on source name"""
+    if source in COLOR_SPACE_MAP:
+        return COLOR_SPACE_MAP[source]
+    
+    source_lower = source.lower()
+    for key in COLOR_SPACE_MAP:
+        if key.lower() in source_lower:
+            return COLOR_SPACE_MAP[key]
+    
+    return 'sRGB'
+def bake():
+    # I hate azdfulla for making me do this
+    bpy.ops.object.bake_textures(source=SOURCE)
+
 class SHADER_OT_append_material(bpy.types.Operator):
     bl_idname = "shader.append_material"
     bl_label = "Append Shader"
@@ -559,7 +764,7 @@ def process_object(obj):
 
 def run_setup():
     if IS_ADDON:
-        global model_path, USE_ROOT_LOCATION, RIG_MODE, EMPTY_IMAGES_BEFORE_SETUP, REPLACE_IMAGES, RESET_PARAMETERS, texture_extension, USE_PATHS, material_file_path, model_file_path, pathToShader, pathToRig, pathToTextures, root
+        global model_path, USE_ROOT_LOCATION, RIG_MODE, BAKE_MODE, SOURCE, EMPTY_IMAGES_BEFORE_SETUP, REPLACE_IMAGES, RESET_PARAMETERS, texture_extension, USE_PATHS, material_file_path, model_file_path, pathToShader, pathToRig, pathToTextures, root
         model_path = bpy.context.scene.warframe_tools_props.model_path
         USE_ROOT_LOCATION = bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION
         EMPTY_IMAGES_BEFORE_SETUP = bpy.context.scene.warframe_tools_props.EMPTY_IMAGES_BEFORE_SETUP
@@ -567,6 +772,7 @@ def run_setup():
         RESET_PARAMETERS = bpy.context.scene.warframe_tools_props.RESET_PARAMETERS
         texture_extension = bpy.context.scene.warframe_tools_props.texture_extension
         USE_PATHS = bpy.context.scene.warframe_tools_props.USE_PATHS
+        SOURCE = bpy.context.scene.warframe_tools_props.bake_source
         if not USE_PATHS:
             material_file_path = bpy.context.scene.warframe_tools_props.material_file_path
             model_file_path = bpy.context.scene.warframe_tools_props.model_file_path
@@ -593,6 +799,8 @@ def run_setup():
         register_shader()
     elif RIG_MODE:
         register_rig()
+    elif BAKE_MODE:
+        bake()
     else:
         mat = bpy.context.object.active_material
         if not mat:
@@ -634,6 +842,8 @@ class WM_OT_SetupPaths(bpy.types.Operator):
             steps.append(('pathToShader', 'Select Shader Blend File', 'file', '*.blend'))
         elif RIG_MODE:
             steps.append(('pathToRig', 'Select Rig Blend File', 'file', '*.blend'))
+        elif BAKE_MODE:
+            return steps
         else:
             steps.append(('material_file_path', 'Select Material File (.txt)', 'file', '*.txt'))
             self.root = bpy.context.scene.warframe_tools_props.root
@@ -646,8 +856,8 @@ class WM_OT_SetupPaths(bpy.types.Operator):
     def invoke(self, context, event):
         self.steps = self.determine_steps()
         if not self.steps:
-            self.report({'ERROR'}, "No paths required for current mode")
-            return {'CANCELLED'}
+            self.report({'WARNING'}, "No paths required for current mode")
+            return self.execute(context)
         self.current_step = 0
         self.filepath = ""
         return self.execute(context)
@@ -776,6 +986,30 @@ if IS_ADDON:
             ]
         index = next((i for i, (first, *_) in enumerate(data) if first == val), None)
         return index
+    def set_uv_value(self, value):
+        global UV_SOURCE_SELECTION
+        
+        obj = bpy.context.selected_objects[0]
+        if not obj or obj.type != 'MESH' or not obj.data.uv_layers:
+            return
+        val = obj.data.uv_layers[value].name
+        UV_SOURCE_SELECTION = val
+        if val in obj.data.uv_layers:
+            for i, uv_layer in enumerate(obj.data.uv_layers):
+                if uv_layer.name == val:
+                    uv_layer.active = True
+    def get_uv_items(self, context):
+        obj = context.selected_objects[0]
+        
+        if not obj or obj.type != 'MESH' or not obj.data.uv_layers:
+            return [("None", "Please select an object", "")]
+        
+        return [(uv.name, uv.name, uv.name) for uv in obj.data.uv_layers]
+    def get_uv_value(self):
+        obj = bpy.context.selected_objects[0]
+        if not obj or obj.type != 'MESH' or not obj.data.uv_layers:
+            return 0
+        return obj.data.uv_layers.active_index
 
     def set_ext_value(self, value):
         available = [
@@ -845,6 +1079,26 @@ if IS_ADDON:
         get=get_ext_value,
         set=set_ext_value
     )
+        bake_source: EnumProperty(
+        name="Source Selection",
+        description="Choose the source from where to bake the textures",
+        items=[
+            ('Base Color', 'Base Color', 'Base Color'),
+            ('Emission', 'Emission', 'Emission'),
+            ('Metalness', 'Metalness', 'Metalness'),
+            ('Roughness', 'Roughness', 'Roughness'),
+            ('Specular', 'Specular', 'Specular'),
+            ('Normal', 'Normal', 'Normal'),
+            ('All', 'All', 'All'),
+        ]
+    )
+        uv_source: EnumProperty(
+        name="UV Map Selection",
+        description="Choose the uv map of the object",
+        items=get_uv_items,
+        get=get_uv_value,
+        set=set_uv_value
+    )
         material_file_path: StringProperty(
         name="Material File Path",
         description=r"Material txt file path (e.g., D:\tmp\Assets\Lotus\Objects\Duviri\Props\DominitiusThraxThroneA.txt)",
@@ -890,6 +1144,7 @@ if IS_ADDON:
             ('APPEND', "Shader Append Mode", "Append the shader from a blend file"),
             ('SHADER', "Shader Setup Mode", "Set up the shader parameters and textures"),
             ('RIG', "Rig Setup Mode", "Set up the rig for characters"),
+            ('BAKE', "Baking Mode", "Bake the textures for the selected object"),
         ],
         default='SHADER',
         update=update_ui
@@ -909,25 +1164,34 @@ if IS_ADDON:
             layout = self.layout
             scene = context.scene
             props = scene.warframe_tools_props
-            global IMPORT_MODEL_MODE, SHADER_APPEND_MODE, RIG_MODE, USE_PATHS
+            global IMPORT_MODEL_MODE, SHADER_APPEND_MODE, RIG_MODE, BAKE_MODE, USE_PATHS
             if IS_ADDON:
                 USE_PATHS = props.USE_PATHS
             if props.mode == 'IMPORT':
                 IMPORT_MODEL_MODE = True
                 SHADER_APPEND_MODE = False
                 RIG_MODE = False
+                BAKE_MODE = False
             elif props.mode == 'APPEND':
                 IMPORT_MODEL_MODE = False
                 SHADER_APPEND_MODE = True
                 RIG_MODE = False
+                BAKE_MODE = False
             elif props.mode == 'RIG':
                 IMPORT_MODEL_MODE = False
                 SHADER_APPEND_MODE = False
                 RIG_MODE = True
+                BAKE_MODE = False
+            elif props.mode == 'BAKE':
+                IMPORT_MODEL_MODE = False
+                SHADER_APPEND_MODE = False
+                RIG_MODE = False
+                BAKE_MODE = True
             else:
                 IMPORT_MODEL_MODE = False
                 RIG_MODE = False
                 SHADER_APPEND_MODE = False
+                BAKE_MODE = False
             box = layout.box()
             box.label(text="Configuration")
             box.label(text="Select Mode:")
@@ -948,7 +1212,12 @@ if IS_ADDON:
                     box.prop(props, "rig_path")
                 layout.operator("wm.run_setup", text="Setup Rig")
                 return
-            if not (IMPORT_MODEL_MODE or SHADER_APPEND_MODE or RIG_MODE):
+            if BAKE_MODE:
+                box.prop(props, "bake_source")
+                box.prop(props, "uv_source")
+                layout.operator("wm.run_setup", text="Bake")
+                return
+            if not (IMPORT_MODEL_MODE or SHADER_APPEND_MODE or RIG_MODE or BAKE_MODE):
                 box.prop(props, "model_path")
                 if not props.USE_PATHS: 
                     box.prop(props, "material_file_path")
@@ -966,7 +1235,7 @@ if IS_ADDON:
         bl_label = "Run Setup"
 
         def execute(self, context):
-            global IMPORT_MODEL_MODE, SHADER_APPEND_MODE, USE_PATHS
+            global IMPORT_MODEL_MODE, SHADER_APPEND_MODE, RIG_MODE, BAKE_MODE, USE_PATHS
             if IS_ADDON:
                 USE_PATHS = bpy.context.scene.warframe_tools_props.USE_PATHS
             mode = context.scene.warframe_tools_props.mode
@@ -974,18 +1243,27 @@ if IS_ADDON:
                 IMPORT_MODEL_MODE = True
                 SHADER_APPEND_MODE = False
                 RIG_MODE = False
+                BAKE_MODE = False
             elif mode == 'APPEND':
                 IMPORT_MODEL_MODE = False
                 SHADER_APPEND_MODE = True
                 RIG_MODE = False
+                BAKE_MODE = False
             elif mode == 'RIG':
                 IMPORT_MODEL_MODE = False
                 SHADER_APPEND_MODE = False
                 RIG_MODE = True
+                BAKE_MODE = False
+            elif mode == 'BAKE':
+                IMPORT_MODEL_MODE = False
+                SHADER_APPEND_MODE = False
+                RIG_MODE = False
+                BAKE_MODE = True
             else:
                 IMPORT_MODEL_MODE = False
                 SHADER_APPEND_MODE = False
                 RIG_MODE = False
+                BAKE_MODE = False
 
             if USE_PATHS:
                 bpy.ops.wm.setup_paths('INVOKE_DEFAULT')
@@ -1001,6 +1279,7 @@ def register():
     bpy.utils.register_class(SHADER_OT_append_material)
     bpy.utils.register_class(RIG_OT_append_rig)
     bpy.utils.register_class(WarframeAddonProperties)
+    bpy.utils.register_class(OBJECT_OT_BakeTextures)
     bpy.types.Scene.warframe_tools_props = PointerProperty(type=WarframeAddonProperties)
     bpy.context.preferences.use_preferences_save = True
 
@@ -1011,13 +1290,14 @@ def unregister():
     bpy.utils.unregister_class(SHADER_OT_append_material)
     bpy.utils.unregister_class(RIG_OT_append_rig)
     bpy.utils.unregister_class(WarframeAddonProperties) 
-    bpy.utils.unregister_class(WarframeAutoPorter)  
+    bpy.utils.unregister_class(WarframeAutoPorter) 
+    bpy.utils.unregister_class(OBJECT_OT_BakeTextures)
+    
     del bpy.types.Scene.warframe_tools_props
 if __name__ == "__main__":
     if IS_ADDON:
         register()
     else:
         bpy.utils.register_class(SHADER_OT_append_material)
-        bpy.utils.register_class(WM_OT_SelectMode)
         bpy.utils.register_class(WM_OT_SetupPaths)
         bpy.ops.wm.select_mode('INVOKE_DEFAULT')
