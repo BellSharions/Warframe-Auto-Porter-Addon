@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "warframe_auto_porter"
-version = "0.43.0"
+version = "0.44.5"
 name = "Warframe Auto Porter Addon"
 module = "warframe_auto_porter"
 tagline = "Imports and configures Warframe models/materials"

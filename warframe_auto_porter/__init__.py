@@ -1,125 +1,85 @@
 bl_info = {
     "name": "Warframe Auto Porter",
     "author": "Bell Sharions",
-    "version": (0, 43),
+    "version": (0, 44),
     "blender": (4, 2, 0),
-    "location": "3D View > Tool Shelf (Right Panel)",
+    "location": "3D View > Tool Shelf (Right Panel) > Tool",
     "description": "Imports and configures Warframe models/materials",
     "category": "Import",
 }
 # Script done by Bell Sharions for Warframe Model Resources
 # This is not a "do it all" script, some assebly and tweaks might be required in some cases
 
-# To use the script:
-# 1. Open it in blender scripting tab of the blend file
-# 2. Set up (Configuration)
-# 3. Select the object you want the script to work on
-# 4. Press "Run script"
-# 5. Check Info panel for script completion/error
-# 6. Double check the material TXT file and tweak the shader accordingly if the model still looks wrong
+# Check Info panel for script completion/error
+# Double check the material TXT file and tweak the shader accordingly if the model still looks wrong
 # If there are errors in the Info panel, something in the material file is not applied, something applied wrongly
 # etc, double check the material file and the previous state of shader. 
 # If the parameter was already set to true by default the script will not set it to false automatically unless
 # RESET_PARAMETERS was set to True in configuration 
 # If the error reoccurs and it not a user error - message the creator of the script
-
-from pathlib import Path
 # Do you want to just launch the script without pasting anything? 
 # Use USE_PATHS to launch UI version. Currently support is limited(I don't know if everything is implemented 
 # for the base user to understand clearly, but should be good enough for the default setup)
-# IMPORTANT: set model_path in this version to the internal path before starting the script
-USE_PATHS = True
+# IMPORTANT: set model_path in this version to the internal path
 # model_path - Set this to the internal model location. 
 # Example: /Lotus/Characters/Tenno/Nyx/SWAures - Nyx Tennogen skin location
 # Set it to the exact internal path. Yes, it begins with /.
-model_path = "/Lotus/Objects/Duviri/Props"
-# !!!!!!!!
-# SET TO FALSE IF USING AS A SCRIPT. THIS IS ONLY FOR ADDON STUFF.
-IS_ADDON = True
 # (Configuration) - Set these paths before running
 # material_file_path - Set this to the path of material TXT file. Yes, including .txt extension.
-material_file_path = Path(r"D:\tmp\Assets\Lotus\Objects\Duviri\Props\DominitiusThraxThroneA.txt")
 # model_file_path - Set if you use IMPORT_MODEL_MODE
-model_file_path = Path(r"D:\tmp\Assets\Lotus\Objects\Duviri\Props\DUVxDominitiusThraxThrone.glb")
 # pathToShader - Set this if you use SHADER_APPEND_MODE. 
 # Assign it to .blend file of where the materials that need to be appended are. Example is for PBRFillDeferred
-pathToShader = r"E:\Download\PBRFillDeferred(5).blend"
-pathToRig = r""
 # Model Setup
 # This section is about model setup. If you just want to setup shader itself - turn both options off
 # IMPORT_MODEL_MODE - Set this if you only want to import the model with the correct settings 
 # for later use like appending shader and using Shader Setup. If set to True THIS WILL NOT RUN THE SHADER SETUP
-IMPORT_MODEL_MODE = False
 # SHADER_APPEND_MODE - Set this to append the shader and assign it to the selected object automatically.
 # If set to True THIS WILL NOT RUN THE SHADER SETUP.
-SHADER_APPEND_MODE = False
-RIG_MODE = False
-
-BAKE_MODE = False
-SOURCE = "Emission"
-IMAGE_NAME = "Baked_Texture"
-IMAGE_SIZE = (2048, 2048)
-MARGIN = 3
-SAMPLES = 1
-COLOR_SPACE_MAP = {
-    'Base Color': 'sRGB',
-    'Emission': 'sRGB',
-    'Metalness': 'Non-Color',
-    'Roughness': 'Non-Color',
-    'Specular': 'Non-Color',
-    'Normal': 'Non-Color'
-}
-UV_SOURCE_SELECTION = 0
-EMISSION_FLAGS_FOR_BAKING = ["emission_mask", "multi_tint_and_mask", "emissive_mask"]
-
-baking_queue = []
-current_job = None
-
 # Shader Setup
 # Method 1 - Copy all the textures from the material TXT file txt in a separate folder and copy the path to pathToTextures
 # pathToTextures - Set this to the path of where ALL the textures from material TXT file are if USE_ROOT_LOCATION is False
-pathToTextures = Path(r"E:\UmbraArmorTextures")
-
 # Method 2 - Set the root folder that contains Lotus, EE, etc folders and model path.
 # USE_ROOT_LOCATION - Set this to use root folder(folder where Lotus, EE, etc are located instead of pathToTextures. 
 # root and model_path locations are required for this to work correctly.
-USE_ROOT_LOCATION = True
 # root - Set this to the Root file location. Set this to the path where Lotus, EE, etc folders are located
 # DO NOT set it to Lotus folder itself, set it to where the root is.
 # In the example path folder 1 has Lotus, EE, SF and other folders that have extracted folders/files.
-root = Path(r"D:\tmp\Assets") 
-
 # EMPTY_IMAGES_BEFORE_SETUP - Set this to flush images before setup. Might cause errors on first run.
-EMPTY_IMAGES_BEFORE_SETUP = True
 # REPLACE_IMAGES - Set this to force replace images
-REPLACE_IMAGES = True
 # RESET_PARAMETERS - Set this to reset all parameters to 0. Does not affect Image Textures.
 # Do not use unless you know what you're doing.
-RESET_PARAMETERS = False
 # texture_extension - Set to the texture extension you're using in *.format style. Examples - *.png, *.dds, *.tga
-texture_extension = "*.png"
-
 # shader_exceptions_parameters - These are the parameters that depend on the specific shader number. 
 # Useful only on rare occasions, like "Swizzle Vertex Channels" in TerrainFill. 
 # Add to this list if the option is not added yet(it likely already was added). 
 # Does not differentiate between shaders
-shader_exceptions_parameters = [ "Swizzle Vertex Channels" ]
 # COMPARING_MODE - set this to also check the shader group name when setting the exceptions.
 # Otherwise will assume first shader in shader list is the correct one.
-COMPARING_MODE = True
-
-
-
+from pathlib import Path
 import bpy
 import os
 import ast
 import bmesh
 from fnmatch import fnmatch
 from bpy.types import Operator, AddonPreferences, Macro, PropertyGroup
-from bpy.props import StringProperty, BoolProperty, PointerProperty, EnumProperty, IntProperty
+from bpy.props import StringProperty, BoolProperty, PointerProperty, EnumProperty, IntProperty, CollectionProperty
 from bpy.app.handlers import persistent
-labeled_reroutes = []
-texture_locations =[]
+
+COLOR_SPACE_MAP = {
+    'Base Color': 'sRGB',
+    'Emission': 'sRGB',
+    'Metalness': 'Non-Color',
+    'Roughness': 'Non-Color',
+    'Specular': 'Non-Color',
+    'Normal': 'Non-Color',
+    'Alpha': 'Non-Color'
+}
+EMISSION_FLAGS_FOR_BAKING = ["emission_mask", "multi_tint_and_mask", "emissive_mask"]
+shader_exceptions_parameters = [ "Swizzle Vertex Channels" ]
+texture_extension_list = [
+    ('*.png', 'PNG', 'Use PNG textures'),
+    ('*.tga', 'TGA', 'Use TGA textures'),
+]
 
 def strtobool (val):
     if not isinstance(val, str):
@@ -133,19 +93,32 @@ def strtobool (val):
 
 def get_color_space(source):
     """Determine color space based on source name"""
-    # Try exact match first
     if source in COLOR_SPACE_MAP:
         return COLOR_SPACE_MAP[source]
-    
-    # Try case-insensitive match
     source_lower = source.lower()
     for key in COLOR_SPACE_MAP:
         if key.lower() in source_lower:
             return COLOR_SPACE_MAP[key]
-    
-    # Default to sRGB if no match found
     return 'sRGB'
 
+def find_internal_path(path):
+    index = path.rfind("Lotus")
+    if index == -1:
+        return ""
+    extracted = path[index:]
+    
+    last_segment = os.path.basename(extracted)
+    if last_segment == '':
+        return extracted
+        
+    if '.' in last_segment:
+        parts = last_segment.split('.')
+        if len(parts) > 1:
+            ext = parts[-1]
+            if ext.isalpha() and 1 <= len(ext) <= 5:
+                extracted = os.path.dirname(extracted)
+    
+    return extracted
 
 def contains(str1, str2):
     if not isinstance(str1, str) or not isinstance(str2, str):
@@ -224,7 +197,7 @@ def parse_material_file(filepath):
                 material_data[value.strip()] = 1
     return (material_data, shader_data)
 
-def connect_textures_and_parameters(material, node_group, parameters, textures, pathToTextures, texture_locations):
+def connect_textures_and_parameters(material, node_group, parameters, textures, pathToTextures, texture_locations, labeled_reroutes, shader_data):
     group_tree = node_group.node_tree
     
     if node_group.name.lower() in parameters.keys():
@@ -244,7 +217,7 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                 else:
                     break
             if hasattr(current, 'image'):
-                if(EMPTY_IMAGES_BEFORE_SETUP):
+                if(bpy.context.scene.warframe_tools_props.EMPTY_IMAGES_BEFORE_SETUP):
                     current.image = None
                 selected_list = texture_locations
                 for tex_name, filename in selected_list.items():
@@ -260,7 +233,7 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                             if(img is None):
                                 img = bpy.data.images.load(filename)
                             img.colorspace_settings.name = 'Non-Color'
-                            if((current.image is None) or (REPLACE_IMAGES and current.image.name not in img.name)):
+                            if((current.image is None) or (bpy.context.scene.warframe_tools_props.REPLACE_IMAGES and current.image.name not in img.name)):
                                 current.image = img
                             print(f"Connected texture: {filename}")
                         except Exception as e:
@@ -269,7 +242,7 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
         if input_socket.name in parameters:
             value = parameters[input_socket.name]
             set_default(input_socket, value)
-        elif(RESET_PARAMETERS):
+        elif(bpy.context.scene.warframe_tools_props.RESET_PARAMETERS):
             reset_default(input_socket)
 
         for name in parameters:
@@ -279,13 +252,13 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                     if input_socket.name.endswith('XYZ'):
                         value = parameters[input_socket.name.split(" ")[0].lower()]
                     elif input_socket.name.endswith('X'):
-                        value = parameters[input_socket.name.split(" ")[0].lower()][0]
+                        value = parameters[input_socket.name.split(" ")[0].lower()] if isinstance(parameters[input_socket.name.split(" ")[0].lower()], int) else parameters[input_socket.name.split(" ")[0].lower()][0]
                     elif input_socket.name.endswith('Y'):
-                        value = parameters[input_socket.name.split(" ")[0].lower()][1]
+                        value = parameters[input_socket.name.split(" ")[0].lower()] if isinstance(parameters[input_socket.name.split(" ")[0].lower()], int) else parameters[input_socket.name.split(" ")[0].lower()][1]
                     elif input_socket.name.endswith('Z'):
-                        value = parameters[input_socket.name.split(" ")[0].lower()][2]
+                        value = parameters[input_socket.name.split(" ")[0].lower()] if isinstance(parameters[input_socket.name.split(" ")[0].lower()], int) else parameters[input_socket.name.split(" ")[0].lower()][2]
                     elif input_socket.name.endswith('W') or input_socket.name.endswith('Alpha'):
-                        value = parameters[input_socket.name.split(" ")[0].lower()][3]
+                        value = parameters[input_socket.name.split(" ")[0].lower()] if isinstance(parameters[input_socket.name.split(" ")[0].lower()], int) else parameters[input_socket.name.split(" ")[0].lower()][3]
                     else:
                         if input_socket.name.lower().endswith("= none"):
                             value = parameters[input_socket.name.lower()]
@@ -301,32 +274,33 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                     print(input_socket.name)
                     print(f"Parameter error: {str(e)}")
                     break
-            elif(RESET_PARAMETERS):
+            elif(bpy.context.scene.warframe_tools_props.RESET_PARAMETERS):
                 reset_default(input_socket)
         if input_socket.name in shader_exceptions_parameters:
             first_value = next(iter(shader_data.values()))
-            if COMPARING_MODE:
-                for key in shader_data:
-                    if key in node_group.node_tree.name:
-                        first_value = shader_data[key]
+            for key in shader_data:
+                if key in node_group.node_tree.name:
+                    first_value = shader_data[key]
             for item in labeled_reroutes:
                 if item == first_value:
                     set_default(input_socket, True)
                                       
-def set_material_properties(material, material_data, pathToTextures, model_path, texture_locations):
+def set_material_properties(material, material_data, pathToTextures, model_path, texture_locations, shader_data):
     parameters = {}
     textures = {}
-    path = model_path if USE_ROOT_LOCATION else str(pathToTextures)
+    labeled_reroutes = []
+    texture_locations = texture_locations
+    path = model_path if bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION else str(pathToTextures)
     if(not path.endswith("/")):
         path += "/"
     for key, value in material_data.items():
         if key.startswith('TX:'):
             result = value
-            if(not result.endswith(texture_extension.split("*")[1]) and "." in result):
-                result = result.split(".")[0] + texture_extension.split("*")[1]
-            if(not "/" in result and USE_ROOT_LOCATION):
+            if(not result.endswith(bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]) and "." in result):
+                result = result.split(".")[0] + bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]
+            if(not "/" in result and bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION):
                 result = path + result
-            if(not USE_ROOT_LOCATION):
+            if(not bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION):
                 result = path + result
             textures[key[3:]] = result
         elif ':' in key:
@@ -334,9 +308,9 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
             parameters[param_name.lower()] = value
         else:
             parameters[key.lower()] = value
-    if(USE_ROOT_LOCATION):
-        root_loc = str(root)
-        if(not str(root).endswith("/")):
+    if(bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION):
+        root_loc = str(bpy.context.scene.warframe_tools_props.root)
+        if(not str(bpy.context.scene.warframe_tools_props.root).endswith("/")):
             root_loc += "/"
         for key, value in textures.items():
             if(os.path.isdir(str(Path(root_loc + value)))):
@@ -348,14 +322,14 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
                     print(root_loc)
                     texture_locations[key + " " + str(idx)] = str(Path(root_loc + value + file))
                 continue
-            elif (not str(Path(root_loc + value)).endswith(texture_extension.split("*")[1])):
-                texture_locations[key] = str(Path(root_loc + value + texture_extension.split("*")[1]))
+            elif (not str(Path(root_loc + value)).endswith(bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1])):
+                texture_locations[key] = str(Path(root_loc + value + bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]))
                 continue
             texture_locations[key] = str(Path(root_loc + value))
-    elif(not USE_ROOT_LOCATION):
+    elif(not bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION):
         for key, value in textures.items():
-            if (not str(Path(str(pathToTextures) + value.split("/")[-1])).endswith(texture_extension.split("*")[1])):
-                texture_locations[key] = str(Path(os.path.join(pathToTextures, value.split("/")[-1]) + texture_extension.split("*")[1]))
+            if (not str(Path(str(pathToTextures) + value.split("/")[-1])).endswith(bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1])):
+                texture_locations[key] = str(Path(os.path.join(pathToTextures, value.split("/")[-1]) + bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]))
                 continue
             texture_locations[key] = os.path.join(pathToTextures, value.split("/")[-1])
     node_groups = []
@@ -368,25 +342,54 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
                 labeled_reroutes.append(node.label)
         if node.type == 'GROUP' and node.node_tree:
             node_groups.append(node)
-    for node in node_groups:  
-        connect_textures_and_parameters(material, node, parameters, textures, pathToTextures, texture_locations)
+    print(texture_locations)
+    node_groups_for_gn = [ng for ng in bpy.data.node_groups if ng.type == 'GEOMETRY' and ng.name.startswith("Gn. ")]
     
-    print(labeled_reroutes)
+    node_group_map = {}
+    print(parameters)
+    for ng in node_groups_for_gn:
+        base_name = ng.name[4:].split(maxsplit=1)[0]
+        node_group_map[base_name.lower()] = ng
+    
+    for param_name, param_value in (parameters | shader_data).items():
+        if param_name.lower() in node_group_map:
+            ng = node_group_map[param_name]
+            
+            mod = bpy.context.active_object.modifiers.new(name=ng.name, type='NODES')
+            mod.node_group = ng
+            
+            for item in ng.interface.items_tree:
+                print(item)
+                if item.item_type == 'SOCKET' and item.in_out == 'INPUT':
+                    socket_name = item.name
+                    if socket_name.lower() in parameters:
+                        try:
+                            value = parameters[socket_name.lower()]
+                            if item.bl_socket_idname == 'NodeSocketBool':
+                                    value = bool(value)
+                            mod[item.identifier] = value
+                            print(f"Setting {mod[item.identifier]} = {parameters[socket_name.lower()]}, {socket_name}")
+                        except Exception as e:
+                            print(f"Error setting {socket_name}: {str(e)}")
+    for node in node_groups:  
+        print(node.type)
+        if node.type is not 'GEOMETRY':
+            connect_textures_and_parameters(material, node, parameters, textures, pathToTextures, texture_locations, labeled_reroutes, shader_data)
 
 def get_shader_items(self, context):
     items = []
-    if not os.path.exists(pathToShader):
+    if not os.path.exists(bpy.context.scene.warframe_tools_props.pathToShader):
         return items
-    with bpy.data.libraries.load(pathToShader, link=False) as (data_from, data_to):
+    with bpy.data.libraries.load(bpy.context.scene.warframe_tools_props.pathToShader, link=False) as (data_from, data_to):
         for mat_name in data_from.materials:
             items.append((mat_name, mat_name, ""))
     return items
 
 def get_rig_items(self, context):
     items = []
-    if not os.path.exists(pathToRig):
+    if not os.path.exists(bpy.context.scene.warframe_tools_props.rig_path):
         return items
-    with bpy.data.libraries.load(pathToRig, link=False) as (data_from, data_to):
+    with bpy.data.libraries.load(bpy.context.scene.warframe_tools_props.rig_path, link=False) as (data_from, data_to):
         for rig_name in data_from.collections:
             print(rig_name)
             if "meta" not in rig_name.lower() and "wgts" not in rig_name.lower():
@@ -395,12 +398,13 @@ def get_rig_items(self, context):
 
 class BakeState:
     """Storage for bake operation state"""
-    def __init__(self, material, output_node, orig_socket, image_node, source_socket):
+    def __init__(self, material, output_node, orig_socket, image_node, source_socket, renderer_state):
         self.material = material
         self.output_node = output_node
         self.orig_socket = orig_socket
         self.image_node = image_node
         self.source_socket = source_socket
+        self.renderer_state = renderer_state
 
 def setup_bake(context, source):
     """Prepare baking for a specific source"""
@@ -437,8 +441,8 @@ def setup_bake(context, source):
     if not source_socket:
         raise Exception(f"Output socket '{source}' not found")
 
-    image_name = f"{IMAGE_NAME}_{source.replace(' ', '_')}"
-    image = bpy.data.images.new(image_name, *IMAGE_SIZE)
+    image_name = f"{material.name}_{source.replace(' ', '')}"
+    image = bpy.data.images.new(image_name, *(bpy.context.scene.warframe_tools_props.bake_width, bpy.context.scene.warframe_tools_props.bake_height))
     image.colorspace_settings.name = get_color_space(source)
     
     image_node = node_tree.nodes.new('ShaderNodeTexImage')
@@ -450,18 +454,39 @@ def setup_bake(context, source):
             node_tree.links.remove(link)
     node_tree.links.new(source_socket, output_node.inputs['Surface'])
     
-    context.scene.render.bake.margin = MARGIN
+    renderer_state = {}
+    renderer_state["margin"] = context.scene.render.bake.margin
+    renderer_state["use_clear"] = context.scene.render.bake.use_clear
+    renderer_state["bake_type"] = context.scene.cycles.bake_type
+    renderer_state["engine"] = context.scene.render.engine
+    renderer_state["samples"] = context.scene.cycles.samples
+    renderer_state["device"] = context.scene.cycles.device
+    
+    context.scene.render.bake.margin = 3
     context.scene.render.bake.use_clear = False
     context.scene.cycles.bake_type = 'EMIT'
+    context.scene.render.engine = 'CYCLES'
+    context.scene.cycles.samples = 3
+        
+    prefs = context.preferences
+    if prefs.addons.get('cycles'):
+        cprefs = prefs.addons['cycles'].preferences
+        if hasattr(cprefs, 'devices') and any(device.type == 'CUDA' for device in cprefs.devices):
+            context.scene.cycles.device = 'GPU'
+
     node_tree.nodes.active = image_node
-    
-    return BakeState(material, output_node, orig_socket, image_node, source_socket)
+    return BakeState(material, output_node, orig_socket, image_node, source_socket, renderer_state)
 
 def cleanup_bake(state):
     """Restore original node connections after baking"""
     if not state or not state.material:
         return
-        
+    bpy.context.scene.render.bake.margin = state.renderer_state["margin"]
+    bpy.context.scene.render.bake.use_clear = state.renderer_state["use_clear"]
+    bpy.context.scene.cycles.bake_type = state.renderer_state["bake_type"]
+    bpy.context.scene.render.engine = state.renderer_state["engine"]
+    bpy.context.scene.cycles.samples = state.renderer_state["samples"]
+    bpy.context.scene.cycles.device = state.renderer_state["device"]
     node_tree = state.material.node_tree
     if not node_tree:
         return
@@ -489,21 +514,8 @@ class OBJECT_OT_BakeTextures(bpy.types.Operator):
     source: bpy.props.StringProperty(name="Source", default="Base Color")
 
     def execute(self, context):
-        context.scene.render.engine = 'CYCLES'
-        context.scene.cycles.samples = SAMPLES
-        
-        prefs = context.preferences
-        if prefs.addons.get('cycles'):
-            cprefs = prefs.addons['cycles'].preferences
-            if hasattr(cprefs, 'devices') and any(device.type == 'CUDA' for device in cprefs.devices):
-                context.scene.cycles.device = 'GPU'
 
-        if self.source == "All":
-            self.sources = ['Base Color', 'Emission', 'Metalness', 
-                           'Roughness', 'Specular', 'Normal']
-        else:
-            self.sources = [self.source]
-
+        self.sources = [s.strip() for s in self.source.split(',') if s.strip()]
         self.current_index = -1
         self.bake_state = None
         self.baking = False
@@ -560,7 +572,24 @@ def get_color_space(source):
     return 'sRGB'
 def bake():
     # I hate azdfulla for making me do this
-    bpy.ops.object.bake_textures(source=SOURCE)
+    props = bpy.context.scene.warframe_tools_props
+    sources = []
+    
+    if props.bake_base_color:
+        sources.append('Base Color')
+    if props.bake_emission:
+        sources.append('Emission')
+    if props.bake_metalness:
+        sources.append('Metalness')
+    if props.bake_roughness:
+        sources.append('Roughness')
+    if props.bake_specular:
+        sources.append('Specular')
+    if props.bake_normal:
+        sources.append('Normal')
+    if props.bake_alpha:
+        sources.append('Alpha')
+    bpy.ops.object.bake_textures(source=",".join(sources))
 
 class SHADER_OT_append_material(bpy.types.Operator):
     bl_idname = "shader.append_material"
@@ -581,12 +610,29 @@ class SHADER_OT_append_material(bpy.types.Operator):
 
         try:
             bpy.ops.wm.append(
-                directory=os.path.join(pathToShader, "Material") + os.sep,
+                directory=os.path.join(bpy.context.scene.warframe_tools_props.pathToShader, "Material") + os.sep,
                 filename=self.material_name
             )
             self.report({'INFO'}, f"Appended material: {self.material_name}")
             obj = bpy.context.object
-
+            gn_node_groups = []
+            try:
+                with bpy.data.libraries.load(bpy.context.scene.warframe_tools_props.pathToShader, link=False) as (data_from, data_to):
+                    gn_node_groups = [name for name in data_from.node_groups if name.startswith("Gn")]
+            except Exception as e:
+                self.report({'WARNING'}, f"Could not read node groups: {str(e)}")
+            
+            for node_group_name in gn_node_groups:
+                if node_group_name not in bpy.data.node_groups:
+                    try:
+                        bpy.ops.wm.append(
+                            directory=os.path.join(bpy.context.scene.warframe_tools_props.pathToShader, "NodeTree") + os.sep,
+                            filename=node_group_name,
+                            do_reuse_local_id=True
+                        )
+                        self.report({'INFO'}, f"Appended node group: {node_group_name}")
+                    except Exception as e:
+                        self.report({'WARNING'}, f"Failed to append node group {node_group_name}: {str(e)}")
             if obj:
                 new_material = bpy.data.materials.get(self.material_name)
                 
@@ -639,20 +685,20 @@ class RIG_OT_append_rig(bpy.types.Operator):
         original_active = context.active_object
         selected = context.selected_objects
         bpy.ops.wm.append(
-            directory=os.path.join(pathToRig, "Collection") + os.sep,
+            directory=os.path.join(bpy.context.scene.warframe_tools_props.rig_path, "Collection") + os.sep,
             filename=self.rig_name
         )
         bpy.ops.wm.append(
-            directory=os.path.join(pathToRig, "Text") + os.sep,
+            directory=os.path.join(bpy.context.scene.warframe_tools_props.rig_path, "Text") + os.sep,
             filename="Bones Snap"
         )
-        self.report({'INFO'}, f"Appended material: {self.rig_name}")
+        self.report({'INFO'}, f"Appended rig: {self.rig_name}")
         obj = bpy.context.object
         new_rig_collection  = bpy.data.collections.get(self.rig_name)
         if new_rig_collection.name not in context.scene.collection.children:
             bpy.context.scene.collection.children.link(new_rig_collection)
         else:
-            print("Failed to append material")
+            print("Failed to append rig")
         target_armature = None
         for obj in new_rig_collection.objects:
             print(obj.name)
@@ -752,63 +798,74 @@ def process_object(obj):
     if obj.type != 'MESH':
         return
     me = obj.data
-    me.flip_normals()
-    bm = bmesh.new()
-    bm.from_mesh(me)
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bm.normal_update()
-    bm.to_mesh(me)
-    bm.free()
+    if not bpy.context.scene.warframe_tools_props.LEVEL_IMPORT:
+        me.flip_normals()
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bm.normal_update()
+        bm.to_mesh(me)
+        bm.free()
     me.shade_smooth()
 
 def run_setup():
-    if IS_ADDON:
-        global model_path, USE_ROOT_LOCATION, RIG_MODE, BAKE_MODE, SOURCE, EMPTY_IMAGES_BEFORE_SETUP, REPLACE_IMAGES, RESET_PARAMETERS, texture_extension, USE_PATHS, material_file_path, model_file_path, pathToShader, pathToRig, pathToTextures, root
-        model_path = bpy.context.scene.warframe_tools_props.model_path
-        USE_ROOT_LOCATION = bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION
-        EMPTY_IMAGES_BEFORE_SETUP = bpy.context.scene.warframe_tools_props.EMPTY_IMAGES_BEFORE_SETUP
-        REPLACE_IMAGES = bpy.context.scene.warframe_tools_props.REPLACE_IMAGES
-        RESET_PARAMETERS = bpy.context.scene.warframe_tools_props.RESET_PARAMETERS
-        texture_extension = bpy.context.scene.warframe_tools_props.texture_extension
-        USE_PATHS = bpy.context.scene.warframe_tools_props.USE_PATHS
-        SOURCE = bpy.context.scene.warframe_tools_props.bake_source
-        if not USE_PATHS:
-            material_file_path = bpy.context.scene.warframe_tools_props.material_file_path
-            model_file_path = bpy.context.scene.warframe_tools_props.model_file_path
-            pathToShader = bpy.context.scene.warframe_tools_props.pathToShader
-            pathToRig = bpy.context.scene.warframe_tools_props.rig_path
-        if not USE_ROOT_LOCATION and not USE_PATHS:
-            pathToTextures = bpy.context.scene.warframe_tools_props.pathToTextures
-        if USE_ROOT_LOCATION and not USE_PATHS:
-            root = bpy.context.scene.warframe_tools_props.root
-    if IMPORT_MODEL_MODE:
+    mode = bpy.context.scene.warframe_tools_props.mode
+    if mode == 'IMPORT':
         bpy.ops.import_scene.gltf(
-            filepath=str(model_file_path), 
+            filepath=str(bpy.context.scene.warframe_tools_props.model_file_path), 
             guess_original_bind_pose=False, 
             bone_heuristic="TEMPERANCE")
-        
+        collections_dict = {}
         for obj in bpy.context.selected_objects:
             if obj.type != 'MESH':
                 continue
-            print(obj.data.validate(clean_customdata=True))
+            # Credit: KptWeedy
+            if bpy.context.scene.warframe_tools_props.LEVEL_IMPORT:
+                print(obj.data.validate(clean_customdata=True))
+                if len(obj.material_slots) > 0 and obj.material_slots[0].material.name.lower().startswith("hidden"):
+                    obj.hide_render = True
+                    obj.hide_set(True)
+                    continue
+                material_name = ""
+                if len(obj.material_slots) > 0 and obj.material_slots[0].material:
+                    material_name = obj.material_slots[0].material.name
+                    bpy.data.materials[material_name].use_fake_user = True
+                    print(f"Processing material: {material_name}")
+                    
+                if material_name:
+                    if material_name not in collections_dict:
+                        new_collection = bpy.data.collections.new(material_name)
+                        bpy.context.scene.collection.children.link(new_collection)
+                        collections_dict[material_name] = new_collection
+                    else:
+                        new_collection = collections_dict[material_name]
+                    
+                    for collection in obj.users_collection:
+                        collection.objects.unlink(obj)
+                    new_collection.objects.link(obj)
             process_object(obj)
             obj.select_set(False)
             print(obj.data.validate(clean_customdata=True))
-    elif SHADER_APPEND_MODE:
+        collections_dict = {}
+            
+    elif mode == 'APPEND':
         register_shader()
-    elif RIG_MODE:
+    elif mode == 'RIG':
         register_rig()
-    elif BAKE_MODE:
+    elif mode == 'BAKE':
         bake()
-    else:
+    elif mode == 'SHADER':
         mat = bpy.context.object.active_material
         if not mat:
             raise Exception("No active material selected")
-        labeled_reroutes = []
         texture_locations = {}
-        (material_data, shader_data) = parse_material_file(material_file_path)
-        set_material_properties(mat, material_data, pathToTextures, model_path, texture_locations)
+        (material_data, shader_data) = parse_material_file(bpy.context.scene.warframe_tools_props.material_file_path)
+        model_path = find_internal_path(bpy.context.scene.warframe_tools_props.material_file_path)
+        print(model_path)
+        print("!!!!")
+        set_material_properties(mat, material_data, bpy.context.scene.warframe_tools_props.pathToTextures, model_path, texture_locations, shader_data)
+        
         
 class WM_OT_SetupPaths(bpy.types.Operator):
     bl_idname = "wm.setup_paths"
@@ -829,27 +886,23 @@ class WM_OT_SetupPaths(bpy.types.Operator):
 
     def determine_steps(self):
         steps = []
-        if IS_ADDON:
-            global USE_ROOT_LOCATION, EMPTY_IMAGES_BEFORE_SETUP, REPLACE_IMAGES, RESET_PARAMETERS, USE_PATHS
-            USE_ROOT_LOCATION = bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION
-            EMPTY_IMAGES_BEFORE_SETUP = bpy.context.scene.warframe_tools_props.EMPTY_IMAGES_BEFORE_SETUP
-            REPLACE_IMAGES = bpy.context.scene.warframe_tools_props.REPLACE_IMAGES
-            RESET_PARAMETERS = bpy.context.scene.warframe_tools_props.RESET_PARAMETERS
-            USE_PATHS = bpy.context.scene.warframe_tools_props.USE_PATHS
-        if IMPORT_MODEL_MODE:
+        mode = bpy.context.scene.warframe_tools_props.mode
+        if mode == 'IMPORT':
             steps.append(('model_file_path', 'Select Model File (.glb)', 'file', '*.glb'))
-        elif SHADER_APPEND_MODE:
+        elif mode == 'APPEND':
             steps.append(('pathToShader', 'Select Shader Blend File', 'file', '*.blend'))
-        elif RIG_MODE:
-            steps.append(('pathToRig', 'Select Rig Blend File', 'file', '*.blend'))
-        elif BAKE_MODE:
+        elif mode == 'RIG':
+            self.root = bpy.context.scene.warframe_tools_props.rig_path
+            if bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION and (self.pathToRig is None or self.pathToRig is ""):
+                steps.append(('pathToRig', 'Select Rig Blend File', 'file', '*.blend'))
+        elif mode == 'BAKE':
             return steps
-        else:
+        elif mode == 'SHADER':
             steps.append(('material_file_path', 'Select Material File (.txt)', 'file', '*.txt'))
             self.root = bpy.context.scene.warframe_tools_props.root
-            if USE_ROOT_LOCATION and (self.root is None or self.root is ""):
+            if bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION and (self.root is None or self.root is ""):
                 steps.append(('root', 'Select Root Directory', 'directory', ''))
-            elif not USE_ROOT_LOCATION:
+            elif not bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION:
                 steps.append(('pathToTextures', 'Select Textures Directory', 'directory', ''))
         return steps
 
@@ -861,22 +914,21 @@ class WM_OT_SetupPaths(bpy.types.Operator):
         self.current_step = 0
         self.filepath = ""
         return self.execute(context)
-
+    
     def execute(self, context):
         if self.current_step >= len(self.steps):
-            global material_file_path, model_file_path, pathToShader, pathToRig, root, pathToTextures
             if self.material_file_path:
-                material_file_path = Path(self.material_file_path)
+                bpy.context.scene.warframe_tools_props.material_file_path = self.material_file_path
             if self.model_file_path:
-                model_file_path = Path(self.model_file_path)
+                bpy.context.scene.warframe_tools_props.model_file_path = self.model_file_path
             if self.pathToRig:
-                pathToRig = self.pathToRig
+                bpy.context.scene.warframe_tools_props.rig_path = self.pathToRig
             if self.pathToShader:
-                pathToShader = self.pathToShader
+                bpy.context.scene.warframe_tools_props.pathToShader = self.pathToShader
             if self.root:
-                root = Path(self.root)
+                bpy.context.scene.warframe_tools_props.root = self.root
             if self.pathToTextures:
-                pathToTextures = Path(self.pathToTextures)
+                bpy.context.scene.warframe_tools_props.pathToTextures = self.pathToTextures
             run_setup()
             self.report({'INFO'}, "Setup Completed Successfully!")
             return {'FINISHED'}
@@ -931,373 +983,331 @@ class WM_OT_SetupPaths(bpy.types.Operator):
                 if current_value:
                     name = os.path.basename(current_value)
                     row.label(text=name, icon='CHECKMARK')
-if IS_ADDON:
-    class WarframeAutoPorter(bpy.types.AddonPreferences):
-        # This must match the add-on name, use `__package__`
-        # when defining this for add-on extensions or a sub-module of a python package.
-        bl_idname = __name__
 
-        root_preference: StringProperty(
-            name="Extracted Root Folder Path",
-            subtype='FILE_PATH'
-        )
-        rig_preference: StringProperty(
-            name="Rig Blend Path",
-            subtype='FILE_PATH'
-        )
-        texture_extension_preference: EnumProperty(
-            name="Texture Extension",
-            description="Choose the texture file extension",
-            items=[
-            ('*.png', 'PNG', 'Use PNG textures'),
-            ('*.tga', 'TGA', 'Use TGA textures'),
-            ('*.dds', 'DDS', 'Use DDS textures'),
-            ],
-            default='*.png'
-        )
-        def draw(self, context):
-            layout = self.layout
-            layout.label(text="Warning! Changing these in the panel will change the preferences!")
-            layout.label(text="Path to the folder where Lotus, EE, DOS, SF and other folders are located.")
-            layout.label(text=r"DO NOT CHOOSE LOTUS FOLDER (example, D:\tmp\Assets)")
-            layout.prop(self, "root_preference")
-            layout.label(text=r"Path to the rig blend file (example, D:\Downloads\WF_Rig.blend)")
-            layout.prop(self, "rig_preference")
-            layout.label(text="Default extracted texture extension.")
-            layout.prop(self, "texture_extension_preference")
-    def get_root_value(self):
-        return bpy.context.preferences.addons[__name__].preferences.root_preference
+class WarframeAutoPorter(bpy.types.AddonPreferences):
+    # This must match the add-on name, use `__package__`
+    # when defining this for add-on extensions or a sub-module of a python package.
+    bl_idname = __name__
 
-    def set_root_value(self, value):
-        bpy.context.preferences.addons[__name__].preferences.root_preference = value  
-        
-    def get_rig_value(self):
-        return bpy.context.preferences.addons[__name__].preferences.rig_preference
-
-    def set_rig_value(self, value):
-        bpy.context.preferences.addons[__name__].preferences.rig_preference = value  
-                
-    def get_ext_value(self):
-        val = bpy.context.preferences.addons[__name__].preferences.texture_extension_preference
-        data = [
-            ('*.png', 'PNG', 'Use PNG textures'),
-            ('*.tga', 'TGA', 'Use TGA textures'),
-            ('*.dds', 'DDS', 'Use DDS textures'),
-            ]
-        index = next((i for i, (first, *_) in enumerate(data) if first == val), None)
-        return index
-    def set_uv_value(self, value):
-        global UV_SOURCE_SELECTION
-        
-        obj = bpy.context.selected_objects[0]
-        if not obj or obj.type != 'MESH' or not obj.data.uv_layers:
-            return
-        val = obj.data.uv_layers[value].name
-        UV_SOURCE_SELECTION = val
-        if val in obj.data.uv_layers:
-            for i, uv_layer in enumerate(obj.data.uv_layers):
-                if uv_layer.name == val:
-                    uv_layer.active = True
-    def get_uv_items(self, context):
-        obj = context.selected_objects[0]
-        
-        if not obj or obj.type != 'MESH' or not obj.data.uv_layers:
-            return [("None", "Please select an object", "")]
-        
-        return [(uv.name, uv.name, uv.name) for uv in obj.data.uv_layers]
-    def get_uv_value(self):
-        obj = bpy.context.selected_objects[0]
-        if not obj or obj.type != 'MESH' or not obj.data.uv_layers:
-            return 0
-        return obj.data.uv_layers.active_index
-
-    def set_ext_value(self, value):
-        available = [
-            ('*.png', 'PNG', 'Use PNG textures'),
-            ('*.tga', 'TGA', 'Use TGA textures'),
-            ('*.dds', 'DDS', 'Use DDS textures'),
-            ]
-        bpy.context.preferences.addons[__name__].preferences.texture_extension_preference = available[value][0]      
-    class OBJECT_OT_addon_prefs_example(bpy.types.Operator):
-        """Display example preferences"""
-        bl_idname = "object.addon_prefs_example"
-        bl_label = "Add-on Preferences Example"
-        bl_options = {'REGISTER', 'UNDO'}
-
-        def execute(self, context):
-            preferences = context.preferences
-            addon_prefs = preferences.addons[__name__].preferences
-
-            return {'FINISHED'}
-    
-    class WarframeAddonProperties(bpy.types.PropertyGroup):
-        def update_ui(self, context):
-            for area in context.screen.areas:
-                if area.type == 'VIEW_3D':
-                    area.tag_redraw()
-
-        model_path: StringProperty(
-        name="Internal Path",
-        description="Internal model path (e.g., /Lotus/Objects/Duviri/Props)",
-        default="/Lotus/Objects/Duviri/Props"
+    root_preference: StringProperty(
+        name="Extracted Root Folder Path",
+        subtype='DIR_PATH'
     )
-        USE_ROOT_LOCATION: BoolProperty(
-        name="Use Root Location",
-        description="Determines paths from mat file using root location",
-        default=True,
-        update=update_ui
+    rig_preference: StringProperty(
+        name="Rig Blend Path",
+        subtype='FILE_PATH'
     )
-        USE_PATHS: BoolProperty(
-        name="Enable automatic paths",
-        description="If deselected - new fields with required paths will appear",
-        default=True,
-        update=update_ui
-    )
-        EMPTY_IMAGES_BEFORE_SETUP: BoolProperty(
-        name="Empty Images Before Setup",
-        description="Empties all images from shader before set up",
-        default=True
-    )
-        REPLACE_IMAGES: BoolProperty(
-        name="Replace Images",
-        description="Replace images with ones from material file if the image was already set previously",
-        default=True
-    )
-        RESET_PARAMETERS: BoolProperty(
-        name="Reset Parameters",
-        description="Sets values that do not exist in the mat txt file to 0, gray, etc. Useful if there are parameters that a set to true but don't exist in your mat file",
-        default=False
-    )
-        texture_extension: EnumProperty(
+    texture_extension_preference: EnumProperty(
         name="Texture Extension",
         description="Choose the texture file extension",
-        items=[
-        ('*.png', 'PNG', 'Use PNG textures'),
-        ('*.tga', 'TGA', 'Use TGA textures'),
-        ('*.dds', 'DDS', 'Use DDS textures'),
-        ],
-        get=get_ext_value,
-        set=set_ext_value
+        items=texture_extension_list,
+        default='*.png'
     )
-        bake_source: EnumProperty(
-        name="Source Selection",
-        description="Choose the source from where to bake the textures",
-        items=[
-            ('Base Color', 'Base Color', 'Base Color'),
-            ('Emission', 'Emission', 'Emission'),
-            ('Metalness', 'Metalness', 'Metalness'),
-            ('Roughness', 'Roughness', 'Roughness'),
-            ('Specular', 'Specular', 'Specular'),
-            ('Normal', 'Normal', 'Normal'),
-            ('All', 'All', 'All'),
-        ]
-    )
-        uv_source: EnumProperty(
-        name="UV Map Selection",
-        description="Choose the uv map of the object",
-        items=get_uv_items,
-        get=get_uv_value,
-        set=set_uv_value
-    )
-        material_file_path: StringProperty(
-        name="Material File Path",
-        description=r"Material txt file path (e.g., D:\tmp\Assets\Lotus\Objects\Duviri\Props\DominitiusThraxThroneA.txt)",
-        default=r"D:\tmp\Assets\Lotus\Objects\Duviri\Props\DominitiusThraxThroneA.txt",
-        subtype='FILE_PATH'
-    )
-        model_file_path: StringProperty(
-        name="Model Path",
-        description=r"Model file path (e.g., D:\tmp\Assets\Lotus\Objects\Duviri\Props\DUVxDominitiusThraxThrone.glb)",
-        default=r"D:\tmp\Assets\Lotus\Objects\Duviri\Props\DUVxDominitiusThraxThrone.glb",
-        subtype='FILE_PATH'
-    )
-        pathToShader: StringProperty(
-        name="Shader Path",
-        description=r"Shader .blend path (e.g., D:\Download\PBRFillDeferred.blend)",
-        default=r"E:\Download\PBRFillDeferred(5).blend",
-        subtype='FILE_PATH'
-    )
-        pathToTextures: StringProperty(
-        name="Textures Path",
-        description=r"Textures folder path (e.g., D:\UmbraArmorTextures)",
-        default=r"E:\UmbraArmorTextures",
-        subtype='FILE_PATH'
-    )    
-        root: StringProperty(
-        name="Extracted Root Folder Path",
-        description=r"Path to the folder where Lotus, EE, DOS, SF and other folders are located. DO NOT CHOOSE LOTUS FOLDER (example, D:\tmp\Assets)",
-        subtype='FILE_PATH',
-        get=get_root_value,
-        set=set_root_value
-    )    
-        rig_path: StringProperty(
-        name="Rig Blend Path",
-        description=r"Path to the .blend path (e.g., D:\Download\WFRig.blend",
-        subtype='FILE_PATH',
-        get=get_rig_value,
-        set=set_rig_value
-    )
-        mode: EnumProperty(
-        name="Mode",
-        items=[
-            ('IMPORT', "Import Model Mode", "Import the model from a file"),
-            ('APPEND', "Shader Append Mode", "Append the shader from a blend file"),
-            ('SHADER', "Shader Setup Mode", "Set up the shader parameters and textures"),
-            ('RIG', "Rig Setup Mode", "Set up the rig for characters"),
-            ('BAKE', "Baking Mode", "Bake the textures for the selected object"),
-        ],
-        default='SHADER',
-        update=update_ui
-    )
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Warning! Changing these in the panel will change the preferences!")
+        layout.label(text="Path to the folder where Lotus, EE, DOS, SF and other folders are located.")
+        layout.label(text=r"DO NOT CHOOSE LOTUS FOLDER (example, D:\tmp\Assets)")
+        layout.prop(self, "root_preference")
+        layout.label(text=r"Path to the rig blend file (example, D:\Downloads\WF_Rig.blend)")
+        layout.prop(self, "rig_preference")
+        layout.label(text="Default extracted texture extension.")
+        layout.prop(self, "texture_extension_preference")
+        
+        
+def get_root_value(self):
+    return bpy.context.preferences.addons[__name__].preferences.root_preference
+def set_root_value(self, value):
+    bpy.context.preferences.addons[__name__].preferences.root_preference = value  
     
-    class WARFRAME_PT_SetupPanel(bpy.types.Panel):
-        bl_label = "Warframe Model Setup"
-        bl_idname = "WARFRAME_PT_SetupPanel"
-        bl_description = "Panel for setting up warframe models"
-        bl_space_type = 'VIEW_3D'
-        bl_region_type = 'UI'
-        bl_category = 'Tool'
+    
+def get_rig_value(self):
+    return bpy.context.preferences.addons[__name__].preferences.rig_preference
+def set_rig_value(self, value):
+    bpy.context.preferences.addons[__name__].preferences.rig_preference = value     
+       
+            
+def set_uv_value(self, value):
+    obj = bpy.context.selected_objects[0]
+    if not obj or obj.type != 'MESH' or not obj.data.uv_layers:
+        return
+    val = obj.data.uv_layers[value].name
+    if val in obj.data.uv_layers:
+        for i, uv_layer in enumerate(obj.data.uv_layers):
+            if uv_layer.name == val:
+                uv_layer.active = True
+def get_uv_items(self, context):
+    obj = context.selected_objects[0]
+    if not obj or obj.type != 'MESH' or not obj.data.uv_layers:
+        return [("None", "Please select an object", "")]
+    return [(uv.name, uv.name, uv.name) for uv in obj.data.uv_layers]
+def get_uv_value(self):
+    obj = bpy.context.selected_objects[0]
+    if not obj or obj.type != 'MESH' or not obj.data.uv_layers:
+        return 0
+    return obj.data.uv_layers.active_index
 
-        def draw(self, context):
-            if not context:
-                return
-            layout = self.layout
-            scene = context.scene
-            props = scene.warframe_tools_props
-            global IMPORT_MODEL_MODE, SHADER_APPEND_MODE, RIG_MODE, BAKE_MODE, USE_PATHS
-            if IS_ADDON:
-                USE_PATHS = props.USE_PATHS
-            if props.mode == 'IMPORT':
-                IMPORT_MODEL_MODE = True
-                SHADER_APPEND_MODE = False
-                RIG_MODE = False
-                BAKE_MODE = False
-            elif props.mode == 'APPEND':
-                IMPORT_MODEL_MODE = False
-                SHADER_APPEND_MODE = True
-                RIG_MODE = False
-                BAKE_MODE = False
-            elif props.mode == 'RIG':
-                IMPORT_MODEL_MODE = False
-                SHADER_APPEND_MODE = False
-                RIG_MODE = True
-                BAKE_MODE = False
-            elif props.mode == 'BAKE':
-                IMPORT_MODEL_MODE = False
-                SHADER_APPEND_MODE = False
-                RIG_MODE = False
-                BAKE_MODE = True
-            else:
-                IMPORT_MODEL_MODE = False
-                RIG_MODE = False
-                SHADER_APPEND_MODE = False
-                BAKE_MODE = False
-            box = layout.box()
-            box.label(text="Configuration")
-            box.label(text="Select Mode:")
-            box.prop(props, "mode")
-            box.prop(props, "USE_PATHS")
-            if IMPORT_MODEL_MODE:
-                if not props.USE_PATHS: 
-                    box.prop(props, "model_file_path")
-                layout.operator("wm.run_setup", text="Import Model")
-                return
-            if SHADER_APPEND_MODE:
-                if not props.USE_PATHS: 
-                    box.prop(props, "pathToShader")
-                layout.operator("wm.run_setup", text="Append Shader")
-                return
-            if RIG_MODE:
-                if not props.USE_PATHS: 
-                    box.prop(props, "rig_path")
-                layout.operator("wm.run_setup", text="Setup Rig")
-                return
-            if BAKE_MODE:
-                box.prop(props, "bake_source")
-                box.prop(props, "uv_source")
-                layout.operator("wm.run_setup", text="Bake")
-                return
-            if not (IMPORT_MODEL_MODE or SHADER_APPEND_MODE or RIG_MODE or BAKE_MODE):
-                box.prop(props, "model_path")
-                if not props.USE_PATHS: 
-                    box.prop(props, "material_file_path")
-                box.prop(props, "USE_ROOT_LOCATION")
-                if not props.USE_PATHS and not props.USE_ROOT_LOCATION: box.prop(props, "pathToTextures")
-                elif not props.USE_PATHS and props.USE_ROOT_LOCATION: box.prop(props, "root") 
-                box.prop(props, "EMPTY_IMAGES_BEFORE_SETUP")
-                box.prop(props, "REPLACE_IMAGES")
-                box.prop(props, "RESET_PARAMETERS")
-                box.prop(props, "texture_extension")
-            layout.operator("wm.run_setup", text="Run Setup")
 
-    class WM_OT_RunSetup(bpy.types.Operator):
-        bl_idname = "wm.run_setup"
-        bl_label = "Run Setup"
+def get_ext_value(self):
+    val = bpy.context.preferences.addons[__name__].preferences.texture_extension_preference
+    index = next((i for i, (first, *_) in enumerate(texture_extension_list) if first == val), None)
+    return index
+def set_ext_value(self, value):
+    bpy.context.preferences.addons[__name__].preferences.texture_extension_preference = texture_extension_list[value][0]      
 
-        def execute(self, context):
-            global IMPORT_MODEL_MODE, SHADER_APPEND_MODE, RIG_MODE, BAKE_MODE, USE_PATHS
-            if IS_ADDON:
-                USE_PATHS = bpy.context.scene.warframe_tools_props.USE_PATHS
-            mode = context.scene.warframe_tools_props.mode
-            if mode == 'IMPORT':
-                IMPORT_MODEL_MODE = True
-                SHADER_APPEND_MODE = False
-                RIG_MODE = False
-                BAKE_MODE = False
-            elif mode == 'APPEND':
-                IMPORT_MODEL_MODE = False
-                SHADER_APPEND_MODE = True
-                RIG_MODE = False
-                BAKE_MODE = False
-            elif mode == 'RIG':
-                IMPORT_MODEL_MODE = False
-                SHADER_APPEND_MODE = False
-                RIG_MODE = True
-                BAKE_MODE = False
-            elif mode == 'BAKE':
-                IMPORT_MODEL_MODE = False
-                SHADER_APPEND_MODE = False
-                RIG_MODE = False
-                BAKE_MODE = True
-            else:
-                IMPORT_MODEL_MODE = False
-                SHADER_APPEND_MODE = False
-                RIG_MODE = False
-                BAKE_MODE = False
 
-            if USE_PATHS:
-                bpy.ops.wm.setup_paths('INVOKE_DEFAULT')
-            else:
-                run_setup()
-                self.report({'INFO'}, "Setup Completed Successfully!")
-            return {'FINISHED'}
+class OBJECT_OT_addon_prefs_example(bpy.types.Operator):
+    """Display example preferences"""
+    bl_idname = "object.addon_prefs_example"
+    bl_label = "Add-on Preferences Example"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+
+        return {'FINISHED'}
+class BakeSourceItem(bpy.types.PropertyGroup):
+    name: StringProperty()
+    value: BoolProperty(name="", default=False)
+    identifier: StringProperty()
+   
+class WarframeAddonProperties(bpy.types.PropertyGroup):
+
+    USE_ROOT_LOCATION: BoolProperty(
+    name="Use Root Location",
+    description="Determines paths from mat file using root location",
+    default=True
+)
+    LEVEL_IMPORT: BoolProperty(
+    name="Import Level",
+    description="Due to differences, level import is slightly different. Choose it if you import levels",
+    default=False
+)
+    USE_PATHS: BoolProperty(
+    name="Enable automatic paths",
+    description="If deselected - new fields with required paths will appear",
+    default=True
+)
+    EMPTY_IMAGES_BEFORE_SETUP: BoolProperty(
+    name="Empty Images Before Setup",
+    description="Empties all images from shader before set up",
+    default=True
+)
+    REPLACE_IMAGES: BoolProperty(
+    name="Replace Images",
+    description="Replace images with ones from material file if the image was already set previously",
+    default=True
+)
+    RESET_PARAMETERS: BoolProperty(
+    name="Reset Parameters",
+    description="Sets values that do not exist in the mat txt file to 0, gray, etc. Useful if there are parameters that a set to true but don't exist in your mat file",
+    default=False
+)
+    texture_extension: EnumProperty(
+    name="Texture Extension",
+    description="Choose the texture file extension",
+    items=texture_extension_list,
+    get=get_ext_value,
+    set=set_ext_value
+)
+    bake_base_color: BoolProperty(
+        name="Base Color",
+        default=True
+    )
+    bake_emission: BoolProperty(
+        name="Emission",
+        default=False
+    )
+    bake_metalness: BoolProperty(
+        name="Metalness",
+        default=False
+    )
+    bake_roughness: BoolProperty(
+        name="Roughness",
+        default=False
+    )
+    bake_specular: BoolProperty(
+        name="Specular",
+        default=False
+    )
+    bake_normal: BoolProperty(
+        name="Normal",
+        default=False
+    )
+    bake_alpha: BoolProperty(
+        name="Alpha",
+        default=False
+    )
+    uv_source: EnumProperty(
+    name="UV Map Selection",
+    description="Choose the uv map of the object",
+    items=get_uv_items,
+    get=get_uv_value,
+    set=set_uv_value
+)
+    bake_height: IntProperty(
+    name="Height",
+    description="Height of the baked texture",
+    default=2048
+)
+    bake_width: IntProperty(
+    name="Width",
+    description="Width of the baked texture",
+    default=2048
+)
+    material_file_path: StringProperty(
+    name="Material File Path",
+    description=r"Material txt file path (e.g., D:\tmp\Assets\Lotus\Objects\Duviri\Props\DominitiusThraxThroneA.txt)",
+    default=r"D:\tmp\Assets\Lotus\Objects\Duviri\Props\DominitiusThraxThroneA.txt",
+    subtype='FILE_PATH'
+)
+    model_file_path: StringProperty(
+    name="Model Path",
+    description=r"Model file path (e.g., D:\tmp\Assets\Lotus\Objects\Duviri\Props\DUVxDominitiusThraxThrone.glb)",
+    default=r"D:\tmp\Assets\Lotus\Objects\Duviri\Props\DUVxDominitiusThraxThrone.glb",
+    subtype='FILE_PATH'
+)
+    pathToShader: StringProperty(
+    name="Shader Path",
+    description=r"Shader .blend path (e.g., D:\Download\PBRFillDeferred.blend)",
+    default=r"E:\Download\PBRFillDeferred(5).blend",
+    subtype='FILE_PATH'
+)
+    pathToTextures: StringProperty(
+    name="Textures Path",
+    description=r"Textures folder path (e.g., D:\UmbraArmorTextures)",
+    default=r"E:\UmbraArmorTextures",
+    subtype='FILE_PATH'
+)    
+    root: StringProperty(
+    name="Extracted Root Folder Path",
+    description=r"Path to the folder where Lotus, EE, DOS, SF and other folders are located. DO NOT CHOOSE LOTUS FOLDER (example, D:\tmp\Assets)",
+    subtype='DIR_PATH',
+    get=get_root_value,
+    set=set_root_value
+)    
+    rig_path: StringProperty(
+    name="Rig Blend Path",
+    description=r"Path to the .blend path (e.g., D:\Download\WFRig.blend",
+    subtype='FILE_PATH',
+    get=get_rig_value,
+    set=set_rig_value
+)
+    mode: EnumProperty(
+    name="Mode",
+    items=[
+        ('IMPORT', "Import Model Mode", "Import the model from a file"),
+        ('APPEND', "Shader Append Mode", "Append the shader from a blend file"),
+        ('SHADER', "Shader Setup Mode", "Set up the shader parameters and textures"),
+        ('RIG', "Rig Setup Mode", "Set up the rig for characters"),
+        ('BAKE', "Baking Mode", "Bake the textures for the selected object"),
+    ],
+    default='SHADER'
+)
+ 
+class WARFRAME_PT_SetupPanel(bpy.types.Panel):
+    bl_label = "Warframe Model Setup"
+    bl_idname = "WARFRAME_PT_SetupPanel"
+    bl_description = "Panel for setting up warframe models"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'Tool'
+
+    def draw(self, context):
+        if not context:
+            return
+        layout = self.layout
+        scene = context.scene
+        props = scene.warframe_tools_props
+        prefs = context.preferences.addons[__name__].preferences
+        box = layout.box()
+        box.label(text="Configuration")
+        box.label(text="Select Mode:")
+        box.prop(props, "mode")
+        box.prop(props, "USE_PATHS")
+        if props.mode == 'IMPORT':
+            box.prop(props, "LEVEL_IMPORT")
+            if not props.USE_PATHS: 
+                box.prop(props, "model_file_path")
+            layout.operator("wm.run_setup", text="Import")
+            return
+        if props.mode == 'APPEND':
+            if not props.USE_PATHS: 
+                box.prop(props, "pathToShader")
+            layout.operator("wm.run_setup", text="Append Shader")
+            return
+        if props.mode == 'RIG':
+            if not props.USE_PATHS: 
+                box.prop(prefs, "rig_preference")
+            layout.operator("wm.run_setup", text="Setup Rig")
+            return
+        if props.mode == 'BAKE':
+            box.label(text="Bake Sources:")
+            grid = box.grid_flow(
+                row_major=True,
+                columns=3,
+                even_columns=True,
+                even_rows=True,
+                align=True
+            )
+            grid.prop(props, "bake_base_color")
+            grid.prop(props, "bake_emission")
+            grid.prop(props, "bake_metalness")
+            grid.prop(props, "bake_roughness")
+            grid.prop(props, "bake_specular")
+            grid.prop(props, "bake_normal")
+            grid.prop(props, "bake_alpha")
+            box.prop(props, "uv_source")
+            row = box.row(align=True)
+            row.prop(props, "bake_height")
+            row.prop(props, "bake_width")
+            layout.operator("wm.run_setup", text="Bake")
+            return
+        if props.mode == 'SHADER':
+            if not props.USE_PATHS: 
+                box.prop(props, "material_file_path")
+            box.prop(props, "USE_ROOT_LOCATION")
+            if not props.USE_PATHS and not props.USE_ROOT_LOCATION: box.prop(props, "pathToTextures")
+            elif not props.USE_PATHS and props.USE_ROOT_LOCATION: box.prop(prefs, "root_preference") 
+            box.prop(props, "EMPTY_IMAGES_BEFORE_SETUP")
+            box.prop(props, "REPLACE_IMAGES")
+            box.prop(props, "RESET_PARAMETERS")
+            box.prop(props, "texture_extension")
+        layout.operator("wm.run_setup", text="Run Setup")
+
+class WM_OT_RunSetup(bpy.types.Operator):
+    bl_idname = "wm.run_setup"
+    bl_label = "Run Setup"
+
+    def execute(self, context):
+        if bpy.context.scene.warframe_tools_props.USE_PATHS:
+            bpy.ops.wm.setup_paths('INVOKE_DEFAULT')
+        else:
+            run_setup()
+            self.report({'INFO'}, "Setup Completed Successfully!")
+        return {'FINISHED'}
+
+classes = (
+    WarframeAutoPorter,
+    WARFRAME_PT_SetupPanel,
+    WM_OT_RunSetup,
+    WM_OT_SetupPaths,
+    SHADER_OT_append_material,
+    RIG_OT_append_rig,
+    WarframeAddonProperties,
+    OBJECT_OT_BakeTextures
+)
 def register():
-    bpy.utils.register_class(WarframeAutoPorter)
-    bpy.utils.register_class(WARFRAME_PT_SetupPanel)
-    bpy.utils.register_class(WM_OT_RunSetup)
-    bpy.utils.register_class(WM_OT_SetupPaths)
-    bpy.utils.register_class(SHADER_OT_append_material)
-    bpy.utils.register_class(RIG_OT_append_rig)
-    bpy.utils.register_class(WarframeAddonProperties)
-    bpy.utils.register_class(OBJECT_OT_BakeTextures)
+    for cls in classes:
+        bpy.utils.register_class(cls)
     bpy.types.Scene.warframe_tools_props = PointerProperty(type=WarframeAddonProperties)
     bpy.context.preferences.use_preferences_save = True
 
 def unregister():
-    bpy.utils.unregister_class(WARFRAME_PT_SetupPanel)
-    bpy.utils.unregister_class(WM_OT_RunSetup)
-    bpy.utils.unregister_class(WM_OT_SetupPaths)
-    bpy.utils.unregister_class(SHADER_OT_append_material)
-    bpy.utils.unregister_class(RIG_OT_append_rig)
-    bpy.utils.unregister_class(WarframeAddonProperties) 
-    bpy.utils.unregister_class(WarframeAutoPorter) 
-    bpy.utils.unregister_class(OBJECT_OT_BakeTextures)
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
     
     del bpy.types.Scene.warframe_tools_props
 if __name__ == "__main__":
-    if IS_ADDON:
-        register()
-    else:
-        bpy.utils.register_class(SHADER_OT_append_material)
-        bpy.utils.register_class(WM_OT_SetupPaths)
-        bpy.ops.wm.select_mode('INVOKE_DEFAULT')
+    register()
