@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Warframe Auto Porter",
     "author": "Bell Sharions",
-    "version": (0, 44),
+    "version": (0, 45),
     "blender": (4, 2, 0),
     "location": "3D View > Tool Shelf (Right Panel) > Tool",
     "description": "Imports and configures Warframe models/materials",
@@ -60,6 +60,8 @@ import bpy
 import os
 import ast
 import bmesh
+import math
+import numpy as np
 from fnmatch import fnmatch
 from bpy.types import Operator, AddonPreferences, Macro, PropertyGroup
 from bpy.props import StringProperty, BoolProperty, PointerProperty, EnumProperty, IntProperty, CollectionProperty
@@ -171,7 +173,7 @@ def parse_material_file(filepath):
                 continue
             if value == '':
                 continue
-            if "shader" in value.lower():
+            if "shader" in value.lower() and '.hlsl' in value.lower():
                 key = value.split("/")[-2]
                 value = value.split("/")[-1].split(".")[0]
                 if value.endswith("p") and "_" in value:
@@ -444,7 +446,7 @@ def setup_bake(context, source):
     image_name = f"{material.name}_{source.replace(' ', '')}"
     image = bpy.data.images.new(image_name, *(bpy.context.scene.warframe_tools_props.bake_width, bpy.context.scene.warframe_tools_props.bake_height))
     image.colorspace_settings.name = get_color_space(source)
-    
+
     image_node = node_tree.nodes.new('ShaderNodeTexImage')
     image_node.image = image
     image_node.location = (output_node.location.x - 300, output_node.location.y + 500)
@@ -590,6 +592,214 @@ def bake():
     if props.bake_alpha:
         sources.append('Alpha')
     bpy.ops.object.bake_textures(source=",".join(sources))
+    
+def normal_to_height(normal_img, iterations=5000, damping=0.1):
+    """
+    Convert normal map to height map using iterative Poisson solver.
+    Args:
+        normal_img: Blender image object (normal map)
+        iterations: Number of solver iterations (higher = more accurate)
+        damping: Relaxation factor (0.1-0.5 recommended)
+    Returns:
+        Height map as 2D numpy array (normalized to 0-1)
+    """
+    normal_px = np.array(normal_img.pixels).reshape(
+        normal_img.size[1], normal_img.size[0], -1
+    )
+    
+    normal_data = normal_px[..., :3].astype(np.float32)
+    normal_data = normal_data * 2.0 - 1.0
+    
+    normal_data[..., 1] *= -1 if bpy.context.scene.warframe_tools_props.invert_green else 1
+    
+    n_x, n_y, n_z = (
+        normal_data[..., 0], 
+        normal_data[..., 1], 
+        np.clip(normal_data[..., 2], 1.0, 1.0)
+    )
+    n_z = 1
+    dx = -n_x / n_z
+    dy = -n_y / n_z
+    
+    h, w = dx.shape
+    f = np.zeros((h, w), dtype=np.float32)
+    
+    f[1:-1, 1:-1] = 0.5 * (dx[1:-1, 2:] - dx[1:-1, :-2]) + \
+                     0.5 * (dy[2:, 1:-1] - dy[:-2, 1:-1])
+    
+    f[0, :] = dy[0, :]
+    f[-1, :] = -dy[-2, :]
+    f[:, 0] = dx[:, 0]
+    f[:, -1] = -dx[:, -2]
+
+    height = np.zeros((h, w), dtype=np.float32)
+    for _ in range(iterations):
+        new_height = height.copy()
+        new_height[1:-1, 1:-1] = (1 - damping) * height[1:-1, 1:-1] + \
+            damping * 0.25 * (
+                height[1:-1, :-2] + 
+                height[1:-1, 2:] + 
+                height[:-2, 1:-1] + 
+                height[2:, 1:-1] - 
+                f[1:-1, 1:-1]
+            )
+        
+        new_height[0, :] = new_height[1, :]
+        new_height[-1, :] = new_height[-2, :]
+        new_height[:, 0] = new_height[:, 1]
+        new_height[:, -1] = new_height[:, -2]
+        height = new_height
+
+    return (height - height.min()) / (height.max() - height.min())
+
+class NormalToHeightOperator(bpy.types.Operator):
+    bl_idname = "dprint.normal_to_height"
+    bl_label = "Convert Normal to Height"
+    
+    def execute(self, context):
+        normal_img = bpy.data.images.load(bpy.context.scene.warframe_tools_props.normal_to_height_path, check_existing=False) 
+        normal_img.colorspace_settings.name = 'Non-Color'
+        height_data = normal_to_height(normal_img, iterations=2000)
+        
+        w, h = normal_img.size
+        height_img = bpy.data.images.new(
+            name=f"{normal_img.name}_Height",
+            width=w,
+            height=h,
+            alpha=False,
+            float_buffer=True
+        )
+        
+        height_rgba = np.zeros((h, w, 4), dtype=np.float32)
+        height_rgba[..., 0] = height_data
+        height_rgba[..., 1] = height_data
+        height_rgba[..., 2] = height_data
+        height_rgba[..., 3] = 1.0          
+        
+        height_img.pixels = height_rgba.ravel()
+        
+        height_img.pack()
+        bpy.context.scene.warframe_tools_props.image_select = height_img.name
+        return {'FINISHED'}
+
+class SubDivisionOperator(bpy.types.Operator):
+    bl_idname = "dprint.subdivide"
+    bl_label = "Add Subdivision Surface Modifier"
+    bl_description = "Adds a Catmull-Clark subdivision surface modifier"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return (
+            context.active_object is not None and
+            context.active_object.type == 'MESH'
+        )
+
+    def execute(self, context):
+        props = bpy.context.scene.warframe_tools_props
+        obj = context.active_object
+        subdiv_levels = props.subdiv_amount
+        ram_subdivision = props.ram_subdivision
+        ram_amount = props.ram_amount * 1000000
+        optimized = props.optimized_subdivision
+        if ram_subdivision:
+            subdiv_levels = int(max(0, math.floor(math.log(ram_amount / len(obj.data.vertices), 4) - 1) if len(obj.data.vertices) <= ram_amount else 0))
+        for mod in obj.modifiers:
+            if mod.name.startswith("AutoSubdivision"):
+                obj.modifiers.remove(mod)
+
+        if optimized and subdiv_levels > 1:
+            base_mod = obj.modifiers.new(name="AutoSubdivision_Base", type='SUBSURF')
+            base_mod.subdivision_type = 'SIMPLE'
+            base_mod.levels = 1
+            base_mod.render_levels = 1
+            base_mod.show_expanded = False
+            
+            detail_mod = obj.modifiers.new(name="AutoSubdivision_Detail", type='SUBSURF')
+            detail_mod.subdivision_type = 'CATMULL_CLARK'
+            detail_levels = max(0, subdiv_levels - 1)
+            detail_mod.levels = detail_levels
+            detail_mod.render_levels = detail_levels
+            detail_mod.show_expanded = False
+            
+            self.report({'INFO'}, f"Added optimized subdivision: Simple(1) + Catmull-Clark({detail_levels})")
+        
+        else:
+            mod = obj.modifiers.new(name="AutoSubdivision", type='SUBSURF')
+            mod.subdivision_type = 'CATMULL_CLARK'
+            mod.levels = subdiv_levels
+            mod.render_levels = subdiv_levels
+            mod.show_expanded = False
+            
+            self.report({'INFO'}, f"Added Catmull-Clark subdivision with {subdiv_levels} levels")
+        
+        return {'FINISHED'} 
+
+class DeformOperator(bpy.types.Operator):
+    bl_idname = "dprint.add_height"
+    bl_label = "Add Height Map as Deform Modifier"
+    bl_description = "Adds displace modifier with selected height map image"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return (
+            context.active_object is not None and
+            context.active_object.type == 'MESH'
+        )
+
+    def execute(self, context):
+        props = bpy.context.scene.warframe_tools_props
+        selected_image_name = props.image_select
+        
+        if selected_image_name == 'NONE' or not selected_image_name:
+            self.report({'ERROR'}, "No image selected")
+            return {'CANCELLED'}
+        
+        img = bpy.data.images.get(selected_image_name)
+        if not img:
+            self.report({'ERROR'}, f"Image '{selected_image_name}' not found")
+            return {'CANCELLED'}
+        
+        obj = context.active_object
+        
+        texture_name = f"{obj.name}_{img.name}_displace"
+        tex = bpy.data.textures.get(texture_name) or bpy.data.textures.new(name=texture_name, type='IMAGE')
+        tex.image = img
+        tex.use_preview_alpha = True
+        
+        modifier_name = f"Displace_{img.name}"
+        mod = obj.modifiers.get(modifier_name) or obj.modifiers.new(name=modifier_name, type='DISPLACE')
+        mod.texture = tex
+        mod.strength = 0.01 
+        mod.texture_coords = 'UV'
+        mod.mid_level = 0.5
+        
+        self.report({'INFO'}, f"Added displace modifier with {img.name}")
+        return {'FINISHED'}
+
+
+class RunAllOperationsOperator(bpy.types.Operator):
+    bl_idname = "dprint.run_all_operations"
+    bl_label = "Run All Operations"
+    bl_description = "Execute normal map conversion, subdivision, and height deformation"
+
+    def execute(self, context):
+        props = bpy.context.scene.warframe_tools_props
+        
+        try:
+            bpy.ops.dprint.normal_to_height()
+            
+            bpy.ops.dprint.subdivide()
+            
+            bpy.ops.dprint.add_height()
+            
+            self.report({'INFO'}, "All operations completed successfully!")
+            return {'FINISHED'}
+            
+        except Exception as e:
+            self.report({'ERROR'}, f"Operation failed: {str(e)}")
+            return {'CANCELLED'}
 
 class SHADER_OT_append_material(bpy.types.Operator):
     bl_idname = "shader.append_material"
@@ -609,15 +819,31 @@ class SHADER_OT_append_material(bpy.types.Operator):
             return {'CANCELLED'}
 
         try:
+            obj = context.object
+            original_base_name = None
+            if obj and obj.data and hasattr(obj.data, 'materials') and obj.data.materials:
+                if obj.data.materials[0]:
+                    original_base_name = obj.data.materials[0].name.split('.')[0]
+
+            before = set(bpy.data.materials.keys())
             bpy.ops.wm.append(
-                directory=os.path.join(bpy.context.scene.warframe_tools_props.pathToShader, "Material") + os.sep,
-                filename=self.material_name
+                directory=os.path.join(context.scene.warframe_tools_props.pathToShader, "Material") + os.sep,
+                filename=self.material_name,
+                do_reuse_local_id=False
             )
+            after = set(bpy.data.materials.keys())
+            new_material_names = after - before
+            
+            if not new_material_names:
+                self.report({'ERROR'}, "Failed to append material")
+                return {'CANCELLED'}
+                
+            new_material = bpy.data.materials[list(new_material_names)[0]]
             self.report({'INFO'}, f"Appended material: {self.material_name}")
-            obj = bpy.context.object
+
             gn_node_groups = []
             try:
-                with bpy.data.libraries.load(bpy.context.scene.warframe_tools_props.pathToShader, link=False) as (data_from, data_to):
+                with bpy.data.libraries.load(context.scene.warframe_tools_props.pathToShader, link=False) as (data_from, data_to):
                     gn_node_groups = [name for name in data_from.node_groups if name.startswith("Gn")]
             except Exception as e:
                 self.report({'WARNING'}, f"Could not read node groups: {str(e)}")
@@ -626,30 +852,37 @@ class SHADER_OT_append_material(bpy.types.Operator):
                 if node_group_name not in bpy.data.node_groups:
                     try:
                         bpy.ops.wm.append(
-                            directory=os.path.join(bpy.context.scene.warframe_tools_props.pathToShader, "NodeTree") + os.sep,
+                            directory=os.path.join(context.scene.warframe_tools_props.pathToShader, "NodeTree") + os.sep,
                             filename=node_group_name,
                             do_reuse_local_id=True
                         )
                         self.report({'INFO'}, f"Appended node group: {node_group_name}")
                     except Exception as e:
                         self.report({'WARNING'}, f"Failed to append node group {node_group_name}: {str(e)}")
-            if obj:
-                new_material = bpy.data.materials.get(self.material_name)
+
+            if original_base_name:
+                old_materials = [mat for mat in bpy.data.materials 
+                                if mat.name.startswith(original_base_name + '.') or 
+                                mat.name == original_base_name]
                 
-                if new_material:
-                    if obj.data.materials and obj.data.materials[0] is not None:
-                        original_name = obj.data.materials[0].name
-                        new_material.name = original_name 
-                        obj.data.materials[0] = new_material
-                    else:
-                        new_name = f"{obj.data.name}_Material"
-                        new_material.name = new_name
-                        obj.data.materials.append(new_material)
-                        obj.data.materials[0] = new_material
-                else:
-                    print("Failed to append material")
+                for old_mat in old_materials:
+                    old_mat.user_remap(new_material)
+                    
+                for old_mat in old_materials:
+                    if old_mat.users == 0 and old_mat != new_material:
+                        bpy.data.materials.remove(old_mat)
+                
+                new_material.name = original_base_name
             else:
-                print("No object selected")
+                if obj and obj.data:
+                    new_name = f"{obj.data.name}_Material"
+                    new_material.name = new_name
+                    
+                    if not obj.data.materials:
+                        obj.data.materials.append(new_material)
+                    else:
+                        obj.data.materials[0] = new_material
+
         except Exception as e:
             self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
@@ -879,6 +1112,7 @@ class WM_OT_SetupPaths(bpy.types.Operator):
     pathToRig: bpy.props.StringProperty(subtype='FILE_PATH')
     root: bpy.props.StringProperty(subtype='DIR_PATH')
     pathToTextures: bpy.props.StringProperty(subtype='DIR_PATH')
+    normal_to_height_path: bpy.props.StringProperty(subtype='DIR_PATH')
     
     filter_glob: bpy.props.StringProperty(default="*")
     directory: bpy.props.StringProperty(subtype='DIR_PATH', default=str(Path.home()))
@@ -897,6 +1131,8 @@ class WM_OT_SetupPaths(bpy.types.Operator):
                 steps.append(('pathToRig', 'Select Rig Blend File', 'file', '*.blend'))
         elif mode == 'BAKE':
             return steps
+        elif mode == 'EXPERIMENTAL':
+            steps.append(('normal_to_height_path', 'Select Normal Map File', 'file', '*'))
         elif mode == 'SHADER':
             steps.append(('material_file_path', 'Select Material File (.txt)', 'file', '*.txt'))
             self.root = bpy.context.scene.warframe_tools_props.root
@@ -925,6 +1161,8 @@ class WM_OT_SetupPaths(bpy.types.Operator):
                 bpy.context.scene.warframe_tools_props.rig_path = self.pathToRig
             if self.pathToShader:
                 bpy.context.scene.warframe_tools_props.pathToShader = self.pathToShader
+            if self.normal_to_height_path:
+                bpy.context.scene.warframe_tools_props.normal_to_height_path = self.normal_to_height_path
             if self.root:
                 bpy.context.scene.warframe_tools_props.root = self.root
             if self.pathToTextures:
@@ -1055,6 +1293,11 @@ def get_ext_value(self):
 def set_ext_value(self, value):
     bpy.context.preferences.addons[__name__].preferences.texture_extension_preference = texture_extension_list[value][0]      
 
+def get_image_items(self, context):
+    items = [(img.name, img.name, "") for img in bpy.data.images]
+    if not items:
+        items.append(('NONE', 'No Images', ""))
+    return items
 
 class OBJECT_OT_addon_prefs_example(bpy.types.Operator):
     """Display example preferences"""
@@ -1103,6 +1346,11 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
     name="Reset Parameters",
     description="Sets values that do not exist in the mat txt file to 0, gray, etc. Useful if there are parameters that a set to true but don't exist in your mat file",
     default=False
+)
+    invert_green: BoolProperty(
+    name="Invert green",
+    description="Inverts green or something, idk...",
+    default=True
 )
     texture_extension: EnumProperty(
     name="Texture Extension",
@@ -1184,6 +1432,7 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
     name="Extracted Root Folder Path",
     description=r"Path to the folder where Lotus, EE, DOS, SF and other folders are located. DO NOT CHOOSE LOTUS FOLDER (example, D:\tmp\Assets)",
     subtype='DIR_PATH',
+    default=r"D:",
     get=get_root_value,
     set=set_root_value
 )    
@@ -1191,8 +1440,41 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
     name="Rig Blend Path",
     description=r"Path to the .blend path (e.g., D:\Download\WFRig.blend",
     subtype='FILE_PATH',
+    default=r"D:",
     get=get_rig_value,
     set=set_rig_value
+)    
+    normal_to_height_path: StringProperty(
+    name="Normal Map Path",
+    description=r"Path to the normal map to make height map out of",
+    default=r"D:",
+    subtype='FILE_PATH'
+)
+    subdiv_amount: IntProperty(
+    name="Subdivision Amount",
+    description="Subdivision Amount",
+    default=4
+)
+    optimized_subdivision: BoolProperty(
+        name="Use Simple + Catmull-Clark",
+        default=False
+)    
+    ram_subdivision: BoolProperty(
+        name="Use Ram Amount To Guess Amount Of Subdivisions",
+        default=False
+)    
+    ram_amount: IntProperty(
+        name="Ram Amount (GB)",
+        default=8
+)    
+    separate_mode: BoolProperty(
+        name="Separate Stages",
+        default=False
+)
+    image_select: bpy.props.EnumProperty(
+        name="Height Map",
+        description="Select an image from the blend file",
+        items=get_image_items
 )
     mode: EnumProperty(
     name="Mode",
@@ -1202,6 +1484,7 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
         ('SHADER', "Shader Setup Mode", "Set up the shader parameters and textures"),
         ('RIG', "Rig Setup Mode", "Set up the rig for characters"),
         ('BAKE', "Baking Mode", "Bake the textures for the selected object"),
+        ('EXPERIMENTAL', "Experimental Mode", "Things for 3d printing and stuff"),
     ],
     default='SHADER'
 )
@@ -1225,24 +1508,27 @@ class WARFRAME_PT_SetupPanel(bpy.types.Panel):
         box.label(text="Configuration")
         box.label(text="Select Mode:")
         box.prop(props, "mode")
-        box.prop(props, "USE_PATHS")
         if props.mode == 'IMPORT':
+            box.prop(props, "USE_PATHS")
             box.prop(props, "LEVEL_IMPORT")
             if not props.USE_PATHS: 
                 box.prop(props, "model_file_path")
             layout.operator("wm.run_setup", text="Import")
             return
         if props.mode == 'APPEND':
+            box.prop(props, "USE_PATHS")
             if not props.USE_PATHS: 
                 box.prop(props, "pathToShader")
             layout.operator("wm.run_setup", text="Append Shader")
             return
         if props.mode == 'RIG':
+            box.prop(props, "USE_PATHS")
             if not props.USE_PATHS: 
                 box.prop(prefs, "rig_preference")
             layout.operator("wm.run_setup", text="Setup Rig")
             return
         if props.mode == 'BAKE':
+            box.prop(props, "USE_PATHS")
             box.label(text="Bake Sources:")
             grid = box.grid_flow(
                 row_major=True,
@@ -1264,7 +1550,40 @@ class WARFRAME_PT_SetupPanel(bpy.types.Panel):
             row.prop(props, "bake_width")
             layout.operator("wm.run_setup", text="Bake")
             return
+        if props.mode == 'EXPERIMENTAL':
+            box.label(text="3d print stuff")
+            box.prop(props, "separate_mode")
+            convert = box.box()
+            convert.prop(props, "normal_to_height_path")
+            convert.prop(props, "invert_green")
+            
+            if props.separate_mode:
+                convert.operator("dprint.normal_to_height", text="Convert Normal Map to Height Map")
+            box.separator()
+            
+            subd = box.box()
+            subd.prop(props, "optimized_subdivision")
+            subd.prop(props, "ram_subdivision")
+            if not props.ram_subdivision:
+                subd.prop(props, "subdiv_amount")
+            if props.ram_subdivision: 
+                subd.prop(props, "ram_amount")
+            
+            if props.separate_mode:
+                subd.operator("dprint.subdivide", text="Add subdivision")
+            box.separator()
+            
+            if props.separate_mode:
+                heightm = box.box()
+                heightm.prop(props, "image_select")
+                heightm.operator("dprint.add_height", text="Add Deform Modifier With Selected Height Map")
+            
+            if not props.separate_mode:
+                row = box.row()
+                row.operator("dprint.run_all_operations", text="Run All Operations")
+            return
         if props.mode == 'SHADER':
+            box.prop(props, "USE_PATHS")
             if not props.USE_PATHS: 
                 box.prop(props, "material_file_path")
             box.prop(props, "USE_ROOT_LOCATION")
@@ -1294,6 +1613,10 @@ classes = (
     WM_OT_RunSetup,
     WM_OT_SetupPaths,
     SHADER_OT_append_material,
+    NormalToHeightOperator,
+    SubDivisionOperator,
+    DeformOperator,
+    RunAllOperationsOperator,
     RIG_OT_append_rig,
     WarframeAddonProperties,
     OBJECT_OT_BakeTextures
