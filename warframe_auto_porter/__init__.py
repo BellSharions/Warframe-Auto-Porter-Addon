@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Warframe Auto Porter",
     "author": "Bell Sharions",
-    "version": (0, 45),
+    "version": (0, 46, 7),
     "blender": (4, 2, 0),
     "location": "3D View > Tool Shelf (Right Panel) > Tool",
     "description": "Imports and configures Warframe models/materials",
@@ -9,6 +9,66 @@ bl_info = {
 }
 # Script done by Bell Sharions for Warframe Model Resources
 # This is not a "do it all" script, some assebly and tweaks might be required in some cases
+
+
+
+                                                                                                    
+#                                 @@@@@                                                              
+#                             @@@@@#*#%@@@@@@@                                                       
+#                         @@@@@%@#+==++*#@@%%@@@                                                     
+#                       @@@%#*+++===+++*#%*=+*#%@@@                                                  
+#                     @@@%+++==--=++++*#*==+++++*%@@@@@@@@@@@@@@@@@@@                                
+#                    @@%*+++=--==+++=-===+++*#%%%%%%%##**#****#****#@@@                              
+#                  @@@#++++=--=++++=--=++*#%%%#**+++++===-----=+++++*%@@@                            
+#                 @@@#+++++--=+++=--=++*#%%#++++++===---::::--=+++++++*%@@@                          
+#                @@%*+++++=--++++=-==+#%#*+++++=---::::::::::-=++++++++++#@@@                        
+#               @@%*++++++=--++=----=+*++++++++--::::::::::::-=++++++++++++*%@@                      
+#              @@%#+++++++--=++=--==-=++++++++=-:::::::::::::-=++++++++++=--=#@@@@@@                 
+#             @@@#++++++++=-=++==++--=++++++++=-::::::::::::-=+++++++++++=--:-+###%%@@@@@@           
+#             @@#+++++++++=-=+*#@%*--=++++++++=-::::::::::::-=++++++++++++=--------++*#%@@@@@@       
+#            %@%*+++++++++=-=#%#%%#+==++++++++=--::::::::---==++++++++++++++======++++++++**#%@@     
+#            @@#+++++*#%@%%#%#-:-+##+==+++++++=--------=====+++++++++++++++++++++++++++++++==+%@@    
+#           #@%*+++*%@@@@ @@+:::..-**==+++++++++++++++++++++++++++++++++++++++++++++++++++=-+#@@     
+#         --=#%**#@@@@   @%+:....::+#+=++++++++++++++++++++++++++++++++=-==+++++++++++++=--+%@@@@@@@ 
+#       =----*%%%%@@    @@+::......-##+=+++++++++++++++++++++++++++===-----+++++++++++==-=*%#****#%@@
+#     ------------*    @@*.::::::...-*##+++====++++++++=======---------==--+++++=====--=*%#*+++++==#@
+#     -----  ::---  **#@%::::::::::..:+#%*+====--------------======--===--=++==------=+##*+++++++-+%@
+#     =----+*=----  *+##*.:::::::::...:+*#%%%%%%%%%%%%%#######****#*+----------==+++++++++++++++==%@@
+#      -----:----=  **##=..:::::::.....:====-:::::::::::---===++++=*%##%%%#*+++++++++++++++++++==#@@@
+#       ---------  @@@#:.....:::................................:..:-+==--=#%#*++++++++++++++==+%%@@@
+#                 @@@#=..................................::::........::.....:+#%#*+++++++++===#%**%@@
+#              @@@@%*+=...........      ...............::::::::............ ...:#@#+++++==--+##++*@@ 
+#        %%@@@@%%%%%%%%*-..............................::::::::::::............=##+==-----==+++++%@@ 
+#     @@@%%#*++++*****##%#=:........::::::::...........::::::::...... .......-*%%#+=-===++++++++*%@  
+#    @@@#*=======+++++++**%%=..:=*#%%%%%%%%%%#*=-:..............::... ......+%@@@@@#*++++++++++*%@@  
+#   @@%**+=======++++++++++*%#%@%#**+++++*++***#@@%-...........:::::......-+++#@@@@@#++++++++++#@@   
+#  @@%*++++====++++++++++++**##***+++++++++++*++**%@%+...........::.....:=++#%@@@@@@#*++++++++*@@@   
+#  @%**+*+++*+++====+++++++**++++++++++++++++++++++*#%#-...........::-=+##%@@@@   @@#++++++++*@@@    
+# @@#*+++++++*+++====+++++++++++++++++++++++++++++++**%#-:::::--==+++*#%@@@       @%*+++++++*%@@     
+# @@#*+++++++++++++++*++++++++++++++++++++++++++++++++#%#+++++++**#%@@@@          @%*++++++#@@@      
+# @@#*++*+++++++++**+++++++++++++++++++++++++++++++*++*%%***##%%@@@@@             @%*++++*#@@@       
+# @@%*++++++++++++*++++++++++++++++++++++++++++++++*++*%@*****#%@@                @%*+++*%@@         
+# @@@#*+++++++++++++++++++++++++++++++++++++++++++++++*%@#*+-:-#@@               -#%#++#@@@          
+#  @@@#*+++***++++++++++++++++++++++++++++++++++++++++#%%%@@#*#@@@             =--=#%%%%#            
+#   @@@#****+++++++++++++++++++++++++++++++++++++++++*%%#@@@@@@@             =-----*%*=--=           
+#    @@@%%%#*++++++++++++++++++++++*#%%%%%%%#**+++++*%@#*#%@@@@             -------  ----=           
+#    @@#**%%***+++++++++++++++++++*#%#******##%%#***%@#+====+#@@           =----=    ----=           
+#   @@#+++#%%%%*+++++++++++++++++++*%%*++=----=+#%%%%+=======*%@           +----=   =-----           
+#  @@#++++++*#%#++++++++++++++++++*#%#+++=-::::=++*#%%#*+====*%@@           +------------            
+# @@%*+++++++*%%#*++++++++++++++++*%%*++++=-:::-=++++*#%%#**+*%@@             --:-----=              
+# @@#*+++++++++#%#*+++++++++++++++*#%%#*+++=====++++++++#%%%%#%@@              ----=+                
+# @@@%#*+++++*#%#*++++++++++++++++++**#%%%#*++++++++++++++*%%#%@@                                    
+#   @@@@@@@@@@@@%#*++*+**+++++++++++**#%@@@@#+++++++++++#%**%%%@@                                    
+#         @@@  @@@%#*++++++++++***#%%@@@@@ @@#++++**+++*%+:.+%@@                                     
+#                @@@@%**+****#%@@@@@@      @@@*+*%%%%%%%%=..=%@@                                     
+#                  @@@@@%%@@@@@@@           @@@@@#:.:::::...=%@@                                     
+#                      @@@@@@                 @@@%*-:.....:=#@@                                      
+#                                               @@@@%#***#%@@@                                       
+#                                                    @@@@@@                                          
+                                                                                                    
+                                                                                                    
+
+
 
 # Check Info panel for script completion/error
 # Double check the material TXT file and tweak the shader accordingly if the model still looks wrong
@@ -59,6 +119,8 @@ from pathlib import Path
 import bpy
 import os
 import ast
+import re
+from collections import OrderedDict
 import bmesh
 import math
 import numpy as np
@@ -82,7 +144,43 @@ texture_extension_list = [
     ('*.png', 'PNG', 'Use PNG textures'),
     ('*.tga', 'TGA', 'Use TGA textures'),
 ]
+special_reset_rules = {
+    'EffectsIntensityStrength': 1,
+    'EffectsIntensity X': 1,
+    'EffectsIntensity Y': 1,
+    'EffectsIntensity Z': 1,
+    'EffectsIntensity W': 1,
+    'EffectsIntensity2 X': 1,
+    'EffectsIntensity2 Y': 1,
+    'PanGlobalScale': 1,
+    'FPS Value': 30,
+    'AOTintColor': tuple([0, 0, 0, 1]),
+    'DetailMapDiffuseRange': 100,
+    'DetailMapNormalRange': 100,
+    'EmissiveTintColor': tuple([1, 1, 1, 1]),
+    'EmissiveTintColor Alpha': 1,
+    'TimeScalar': 1,
+    'UVScale01 X': 1,
+    'UVScale01 Y': 1,
+    'UVScale01 Z': 1,
+    'UVScale01 W': 1,
+    'UVScale23 X': 1,
+    'UVScale23 Y': 1,
+    'UVScale23 Z': 1,
+    'UVScale23 W': 1,
+    'HeightPanScale X': 0,
+    'HeightPanScale Y': 0,
+    'HeightPanScale Z': 1,
+    'HeightPanScale W': 1
+}
 
+special_aliases = {
+    "TINT_MASK_PACK_MAP_BLEND": "TINT_MASK_PACK_MAP",
+}
+
+special_ignores = {
+    # "EMISSIVE_COMPRESSION = EC_COMPONENT": "EmissiveTintColor",
+}
 def strtobool (val):
     if not isinstance(val, str):
         return val
@@ -104,7 +202,9 @@ def get_color_space(source):
     return 'sRGB'
 
 def find_internal_path(path):
-    index = path.rfind("Lotus")
+    print(path)
+    index = path.find("Lotus")
+    print(index)
     if index == -1:
         return ""
     extracted = path[index:]
@@ -129,6 +229,14 @@ def contains(str1, str2):
         return str1.lower() == str2.lower()
     return str1.lower() in str2.lower()
 
+def containstexture(str1, str2):
+    if not isinstance(str1, str) or not isinstance(str2, str):
+        return True
+    if '=' in str1.lower() or '=' in str2.lower():
+        return str1.lower() == str2.lower()
+    pattern = re.compile(r'\b' + re.escape(str1.lower()) + r'\b')
+    return bool(pattern.search(str2.lower()))
+
 def set_default(input_socket, value):
     if input_socket.type == 'VECTOR':
         input_socket.default_value = tuple(value[:3])
@@ -141,6 +249,10 @@ def set_default(input_socket, value):
     elif input_socket.type == 'VALUE':
         input_socket.default_value = float(value)
 def reset_default(input_socket):
+    socket_name = input_socket.name
+    if socket_name in special_reset_rules:
+        input_socket.default_value = special_reset_rules[socket_name]
+        return
     if input_socket.type == 'VECTOR':
         input_socket.default_value = tuple([0, 0, 0])
     elif input_socket.type == 'BOOLEAN':
@@ -173,11 +285,11 @@ def parse_material_file(filepath):
                 continue
             if value == '':
                 continue
-            if "shader" in value.lower() and '.hlsl' in value.lower():
-                key = value.split("/")[-2]
-                value = value.split("/")[-1].split(".")[0]
-                if value.endswith("p") and "_" in value:
-                    shader_data[key] = value.split("_")[0]
+            if '_p.hlsl' in value.lower():
+                print(value)
+                key = value.lower()
+                value = 1
+                shader_data[key] = value
                 continue
             
             try:
@@ -197,7 +309,19 @@ def parse_material_file(filepath):
                     continue
                 material_data[key] = 1
                 material_data[value.strip()] = 1
-    return (material_data, shader_data)
+    
+    for key in material_data:
+        if isinstance(material_data[key], str) and material_data[key] in special_aliases:
+            material_data[key] = special_aliases[material_data[key]]
+
+    keys = list(material_data.keys())
+    for old_key in keys:
+        if old_key in special_aliases:
+            new_key = special_aliases[old_key]
+            if old_key != new_key:
+                material_data[new_key] = material_data.pop(old_key)
+    sorted_material = OrderedDict(sorted(material_data.items(), key=lambda t: t[0]))
+    return (sorted_material, shader_data)
 
 def connect_textures_and_parameters(material, node_group, parameters, textures, pathToTextures, texture_locations, labeled_reroutes, shader_data):
     group_tree = node_group.node_tree
@@ -206,7 +330,14 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
         for nodegroup_to_link in bpy.data.node_groups:
             if parameters[node_group.name.lower()] in nodegroup_to_link.name:
                 node_group.node_tree = nodegroup_to_link
-            
+    print(group_tree.name)
+    if "Vertex Shader".lower() in group_tree.name.lower():
+        print(node_group.name)
+        print("AAA")
+        for input_socket in node_group.inputs:
+            if input_socket.name.lower() in shader_data:
+                set_default(input_socket, True)   
+        return     
     
     for input_socket in node_group.inputs:
         if(input_socket.links):
@@ -226,7 +357,7 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                     if(isinstance(filename, int)):
                         continue
                     name = filename.split('/')[-1]
-                    if any(contains(tex_name, input_socket.name) for link in input_socket.links):
+                    if any(containstexture(tex_name, input_socket.name) for link in input_socket.links):
                         try:
                             img = None
                             for img_tex in bpy.data.images:
@@ -278,14 +409,6 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                     break
             elif(bpy.context.scene.warframe_tools_props.RESET_PARAMETERS):
                 reset_default(input_socket)
-        if input_socket.name in shader_exceptions_parameters:
-            first_value = next(iter(shader_data.values()))
-            for key in shader_data:
-                if key in node_group.node_tree.name:
-                    first_value = shader_data[key]
-            for item in labeled_reroutes:
-                if item == first_value:
-                    set_default(input_socket, True)
                                       
 def set_material_properties(material, material_data, pathToTextures, model_path, texture_locations, shader_data):
     parameters = {}
@@ -298,12 +421,25 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
     for key, value in material_data.items():
         if key.startswith('TX:'):
             result = value
+            print(result)
+            setone = False
             if(not result.endswith(bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]) and "." in result):
                 result = result.split(".")[0] + bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]
+            
+            print(result)
             if(not "/" in result and bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION):
                 result = path + result
+                
+                print(result)
+                setone = True
+            if(not result.startswith("/") and "/" in result and bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION and not setone):
+                result = path + result
+                
+                print(result)
             if(not bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION):
                 result = path + result
+                
+                print(result)
             textures[key[3:]] = result
         elif ':' in key:
             prefix, param_name = key.split(':', 1)
@@ -334,6 +470,11 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
                 texture_locations[key] = str(Path(os.path.join(pathToTextures, value.split("/")[-1]) + bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]))
                 continue
             texture_locations[key] = os.path.join(pathToTextures, value.split("/")[-1])
+            
+    for trigger_value, key_to_remove in special_ignores.items():
+        if trigger_value.lower() in parameters.keys() and key_to_remove.lower() in parameters:
+            del parameters[key_to_remove.lower()]
+    
     node_groups = []
     for node in material.node_tree.nodes:
         if node.type == 'REROUTE' and node.label.strip():
@@ -355,7 +496,7 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
     
     for param_name, param_value in (parameters | shader_data).items():
         if param_name.lower() in node_group_map:
-            ng = node_group_map[param_name]
+            ng = node_group_map[param_name.lower()]
             
             mod = bpy.context.active_object.modifiers.new(name=ng.name, type='NODES')
             mod.node_group = ng
@@ -459,12 +600,15 @@ def setup_bake(context, source):
     renderer_state = {}
     renderer_state["margin"] = context.scene.render.bake.margin
     renderer_state["use_clear"] = context.scene.render.bake.use_clear
+    renderer_state["target"] = context.scene.render.bake.target
     renderer_state["bake_type"] = context.scene.cycles.bake_type
     renderer_state["engine"] = context.scene.render.engine
     renderer_state["samples"] = context.scene.cycles.samples
     renderer_state["device"] = context.scene.cycles.device
+    renderer_state["device"] = context.scene.cycles.device
     
     context.scene.render.bake.margin = 3
+    context.scene.render.bake.target = 'IMAGE_TEXTURES'
     context.scene.render.bake.use_clear = False
     context.scene.cycles.bake_type = 'EMIT'
     context.scene.render.engine = 'CYCLES'
@@ -485,6 +629,7 @@ def cleanup_bake(state):
         return
     bpy.context.scene.render.bake.margin = state.renderer_state["margin"]
     bpy.context.scene.render.bake.use_clear = state.renderer_state["use_clear"]
+    bpy.context.scene.render.bake.target = state.renderer_state["target"]
     bpy.context.scene.cycles.bake_type = state.renderer_state["bake_type"]
     bpy.context.scene.render.engine = state.renderer_state["engine"]
     bpy.context.scene.cycles.samples = state.renderer_state["samples"]
@@ -1031,11 +1176,43 @@ def process_object(obj):
     if obj.type != 'MESH':
         return
     me = obj.data
+    if me.color_attributes:
+
+        attrs_to_convert = []
+
+        for attr in me.color_attributes:
+            if attr.domain == 'POINT':
+                data = []
+                if attr.data_type in {'BYTE_COLOR', 'FLOAT_COLOR'}:
+                    data = [d.color for d in attr.data]
+                elif attr.data_type == 'FLOAT_VECTOR':
+                    data = [d.vector for d in attr.data]
+                else:
+                    data = [d.value for d in attr.data]
+                
+                attrs_to_convert.append((attr.name, attr.data_type, data))
+
+        for name, data_type, original_data in attrs_to_convert:
+            if name in me.color_attributes:
+                me.color_attributes.remove(me.attributes[name])
+
+            new_attr = me.color_attributes.new(name=name, type=data_type, domain='CORNER')
+
+            for poly in me.polygons:
+                for loop_idx in poly.loop_indices:
+                    vert_idx = me.loops[loop_idx].vertex_index
+                    
+                    if data_type in {'BYTE_COLOR', 'FLOAT_COLOR'}:
+                        new_attr.data[loop_idx].color = original_data[vert_idx]
+                    elif data_type == 'FLOAT_VECTOR':
+                        new_attr.data[loop_idx].vector = original_data[vert_idx]
+                    else:
+                        new_attr.data[loop_idx].value = original_data[vert_idx]
     if not bpy.context.scene.warframe_tools_props.LEVEL_IMPORT:
         me.flip_normals()
         bm = bmesh.new()
         bm.from_mesh(me)
-        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0001)
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         bm.normal_update()
         bm.to_mesh(me)
@@ -1113,7 +1290,7 @@ class WM_OT_SetupPaths(bpy.types.Operator):
     root: bpy.props.StringProperty(subtype='DIR_PATH')
     pathToTextures: bpy.props.StringProperty(subtype='DIR_PATH')
     normal_to_height_path: bpy.props.StringProperty(subtype='DIR_PATH')
-    
+
     filter_glob: bpy.props.StringProperty(default="*")
     directory: bpy.props.StringProperty(subtype='DIR_PATH', default=str(Path.home()))
     filepath: bpy.props.StringProperty(subtype='FILE_PATH')
@@ -1149,6 +1326,7 @@ class WM_OT_SetupPaths(bpy.types.Operator):
             return self.execute(context)
         self.current_step = 0
         self.filepath = ""
+        self.directory = str(Path.home())
         return self.execute(context)
     
     def execute(self, context):
@@ -1174,10 +1352,15 @@ class WM_OT_SetupPaths(bpy.types.Operator):
         step = self.steps[self.current_step]
         step_id, label, step_type, filter_glob = step
         current_value = getattr(self, step_id, "")
+        props = context.scene.warframe_tools_props
 
         if not current_value:
             if step_type == 'file':
                 if not self.filepath:
+                    if hasattr(props, step_id):
+                        scene_value = getattr(props, step_id)
+                        if scene_value:
+                            self.filepath = scene_value
                     self.filter_glob = filter_glob
                     context.window_manager.fileselect_add(self)
                     return {'RUNNING_MODAL'}
@@ -1187,6 +1370,10 @@ class WM_OT_SetupPaths(bpy.types.Operator):
                     self.current_step += 1
             elif step_type == 'directory':
                 if not self.filepath:
+                    if hasattr(props, step_id):
+                        scene_value = getattr(props, step_id)
+                        if scene_value:
+                            self.filepath = scene_value
                     context.window_manager.fileselect_add(self)
                     return {'RUNNING_MODAL'}
                 else:
