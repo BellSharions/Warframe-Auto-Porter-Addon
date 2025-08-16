@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Warframe Auto Porter",
     "author": "Bell Sharions",
-    "version": (0, 46, 7),
+    "version": (0, 46, 8),
     "blender": (4, 2, 0),
     "location": "3D View > Tool Shelf (Right Panel) > Tool",
     "description": "Imports and configures Warframe models/materials",
@@ -1178,36 +1178,49 @@ def process_object(obj):
     me = obj.data
     if me.color_attributes:
 
-        attrs_to_convert = []
+        mesh = obj.data
+        loops = mesh.loops
+        polygons = mesh.polygons
+        
+        color_attr_names = []
+        for att in mesh.color_attributes:
+            if att.domain == 'POINT':
+                color_attr_names.append(att.name)
+        
+        if not color_attr_names:
+            return
 
-        for attr in me.color_attributes:
-            if attr.domain == 'POINT':
-                data = []
-                if attr.data_type in {'BYTE_COLOR', 'FLOAT_COLOR'}:
-                    data = [d.color for d in attr.data]
-                elif attr.data_type == 'FLOAT_VECTOR':
-                    data = [d.vector for d in attr.data]
-                else:
-                    data = [d.value for d in attr.data]
+        for attr_name in color_attr_names:
+            if attr_name not in mesh.color_attributes:
+                continue
                 
-                attrs_to_convert.append((attr.name, attr.data_type, data))
-
-        for name, data_type, original_data in attrs_to_convert:
-            if name in me.color_attributes:
-                me.color_attributes.remove(me.attributes[name])
-
-            new_attr = me.color_attributes.new(name=name, type=data_type, domain='CORNER')
-
-            for poly in me.polygons:
+            color_attr = mesh.color_attributes[attr_name]
+            if color_attr.is_internal or color_attr.is_required:
+                continue
+                
+            old_name = color_attr.name
+            new_attr = mesh.color_attributes.new(
+                name=old_name,
+                type=color_attr.data_type,
+                domain='CORNER'
+            )
+            src_data = [0.0] * (len(mesh.vertices) * 4)
+            color_attr.data.foreach_get('color', src_data)
+            dst_data = [0.0] * (len(loops) * 4)
+            for poly in polygons:
                 for loop_idx in poly.loop_indices:
-                    vert_idx = me.loops[loop_idx].vertex_index
-                    
-                    if data_type in {'BYTE_COLOR', 'FLOAT_COLOR'}:
-                        new_attr.data[loop_idx].color = original_data[vert_idx]
-                    elif data_type == 'FLOAT_VECTOR':
-                        new_attr.data[loop_idx].vector = original_data[vert_idx]
-                    else:
-                        new_attr.data[loop_idx].value = original_data[vert_idx]
+                    vert_idx = loops[loop_idx].vertex_index
+                    src_idx = vert_idx * 4
+                    dst_idx = loop_idx * 4
+                    dst_data[dst_idx] = src_data[src_idx]
+                    dst_data[dst_idx + 1] = src_data[src_idx + 1]
+                    dst_data[dst_idx + 2] = src_data[src_idx + 2]
+                    dst_data[dst_idx + 3] = src_data[src_idx + 3]
+            
+            new_attr.data.foreach_set('color', dst_data)
+            new_attr.data.update()
+            mesh.color_attributes.remove(color_attr)
+            new_attr.name = old_name
     if not bpy.context.scene.warframe_tools_props.LEVEL_IMPORT:
         me.flip_normals()
         bm = bmesh.new()
