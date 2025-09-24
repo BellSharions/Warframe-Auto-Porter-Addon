@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Warframe Auto Porter",
     "author": "Bell Sharions",
-    "version": (0, 46, 8),
+    "version": (0, 48, 3),
     "blender": (4, 2, 0),
     "location": "3D View > Tool Shelf (Right Panel) > Tool",
     "description": "Imports and configures Warframe models/materials",
@@ -9,9 +9,6 @@ bl_info = {
 }
 # Script done by Bell Sharions for Warframe Model Resources
 # This is not a "do it all" script, some assebly and tweaks might be required in some cases
-
-
-
                                                                                                     
 #                                 @@@@@                                                              
 #                             @@@@@#*#%@@@@@@@                                                       
@@ -67,58 +64,12 @@ bl_info = {
 #                                                    @@@@@@                                          
                                                                                                     
                                                                                                     
-
-
-
-# Check Info panel for script completion/error
-# Double check the material TXT file and tweak the shader accordingly if the model still looks wrong
-# If there are errors in the Info panel, something in the material file is not applied, something applied wrongly
-# etc, double check the material file and the previous state of shader. 
-# If the parameter was already set to true by default the script will not set it to false automatically unless
-# RESET_PARAMETERS was set to True in configuration 
-# If the error reoccurs and it not a user error - message the creator of the script
-# Do you want to just launch the script without pasting anything? 
-# Use USE_PATHS to launch UI version. Currently support is limited(I don't know if everything is implemented 
-# for the base user to understand clearly, but should be good enough for the default setup)
-# IMPORTANT: set model_path in this version to the internal path
-# model_path - Set this to the internal model location. 
-# Example: /Lotus/Characters/Tenno/Nyx/SWAures - Nyx Tennogen skin location
-# Set it to the exact internal path. Yes, it begins with /.
-# (Configuration) - Set these paths before running
-# material_file_path - Set this to the path of material TXT file. Yes, including .txt extension.
-# model_file_path - Set if you use IMPORT_MODEL_MODE
-# pathToShader - Set this if you use SHADER_APPEND_MODE. 
-# Assign it to .blend file of where the materials that need to be appended are. Example is for PBRFillDeferred
-# Model Setup
-# This section is about model setup. If you just want to setup shader itself - turn both options off
-# IMPORT_MODEL_MODE - Set this if you only want to import the model with the correct settings 
-# for later use like appending shader and using Shader Setup. If set to True THIS WILL NOT RUN THE SHADER SETUP
-# SHADER_APPEND_MODE - Set this to append the shader and assign it to the selected object automatically.
-# If set to True THIS WILL NOT RUN THE SHADER SETUP.
-# Shader Setup
-# Method 1 - Copy all the textures from the material TXT file txt in a separate folder and copy the path to pathToTextures
-# pathToTextures - Set this to the path of where ALL the textures from material TXT file are if USE_ROOT_LOCATION is False
-# Method 2 - Set the root folder that contains Lotus, EE, etc folders and model path.
-# USE_ROOT_LOCATION - Set this to use root folder(folder where Lotus, EE, etc are located instead of pathToTextures. 
-# root and model_path locations are required for this to work correctly.
-# root - Set this to the Root file location. Set this to the path where Lotus, EE, etc folders are located
-# DO NOT set it to Lotus folder itself, set it to where the root is.
-# In the example path folder 1 has Lotus, EE, SF and other folders that have extracted folders/files.
-# EMPTY_IMAGES_BEFORE_SETUP - Set this to flush images before setup. Might cause errors on first run.
-# REPLACE_IMAGES - Set this to force replace images
-# RESET_PARAMETERS - Set this to reset all parameters to 0. Does not affect Image Textures.
-# Do not use unless you know what you're doing.
-# texture_extension - Set to the texture extension you're using in *.format style. Examples - *.png, *.dds, *.tga
-# shader_exceptions_parameters - These are the parameters that depend on the specific shader number. 
-# Useful only on rare occasions, like "Swizzle Vertex Channels" in TerrainFill. 
-# Add to this list if the option is not added yet(it likely already was added). 
-# Does not differentiate between shaders
-# COMPARING_MODE - set this to also check the shader group name when setting the exceptions.
-# Otherwise will assume first shader in shader list is the correct one.
 from pathlib import Path
 import bpy
 import os
 import ast
+import traceback
+import time
 import re
 from collections import OrderedDict
 import bmesh
@@ -160,6 +111,10 @@ special_reset_rules = {
     'EmissiveTintColor': tuple([1, 1, 1, 1]),
     'EmissiveTintColor Alpha': 1,
     'TimeScalar': 1,
+    'UvScale X': 1,
+    'UvScale Y': 1,
+    'UvScale Z': 1,
+    'UvScale W': 1,
     'UVScale01 X': 1,
     'UVScale01 Y': 1,
     'UVScale01 Z': 1,
@@ -171,7 +126,28 @@ special_reset_rules = {
     'HeightPanScale X': 0,
     'HeightPanScale Y': 0,
     'HeightPanScale Z': 1,
-    'HeightPanScale W': 1
+    'HeightPanScale W': 1,
+    'AlphaTestValue': 0.5,
+    'FacingRoughness': 1,
+    'GlancingRoughness': 1,
+    'EmissiveFresnelPow': 1,
+    'emissiveFade Y': 1,
+    'FlickerParam X': 1,
+    'GlassColor': tuple([1, 1, 1, 0]),
+    'WetBias': -1,
+    'Roughness': 0.5,
+    'Radius': tuple([1, 0.2, 0.1]),
+    'X Scale': 1,
+    'Y Scale': 1,
+    'HairCapMask X': 1,
+    'HairCapMask Y': 1,
+    'HairCapMask Z': 1,
+    'HairCapMask W': 1,
+    'MakeUpMask X': 1,
+    'MakeUpMask Y': 1,
+    'MakeUpMask Z': 1,
+    'MakeUpMask W': 1,
+    
 }
 
 special_aliases = {
@@ -181,6 +157,144 @@ special_aliases = {
 special_ignores = {
     # "EMISSIVE_COMPRESSION = EC_COMPONENT": "EmissiveTintColor",
 }
+
+texture_ignores = [
+    "BaseMaterialMetal"
+]
+extractor_commands = {    
+    "Texture": '{0} --extract-textures --texture-format {2} --cache-dir "{1}" --internal-path "{3}" --output-path "{4}"',
+    "Material": '{0} --extract-materials --cache-dir "{1}" --internal-path "{2}" --output-path "{3}"'
+}
+def extract_texture_with_cli(extractor_path, cache_path, texture_format, internal_path, output_dir):
+    import subprocess
+    import os
+    
+    cmd = extractor_commands["Texture"].format(
+        Path(extractor_path), 
+        Path(cache_path),
+        texture_format,
+        internal_path,
+        Path(output_dir)
+    )
+    
+    try:
+        print(f"Running command: {cmd}")
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"Successfully extracted texture: {internal_path}")
+            return True
+        else:
+            print(f"Extractor failed with error: {result.stderr}")
+            return False
+    except Exception as e:
+        print(f"Error running extractor: {str(e)}")
+        return False
+
+def extract_material_with_cli(extractor_path, cache_path, internal_path, output_dir):
+    import subprocess
+    import os
+    
+    cmd = extractor_commands["Material"].format(
+        Path(extractor_path), 
+        Path(cache_path),
+        internal_path,
+        Path(output_dir)
+    )
+    
+    try:
+        print(f"Running command: {cmd}")
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"Successfully extracted material: {internal_path}")
+            return True
+        else:
+            print(f"Extractor failed with error: {result.stderr}")
+            return False
+    except Exception as e:
+        print(f"Error running extractor: {str(e)}")
+        return False
+    
+def find_shader_material(shader_name, shader_library_path):
+    
+    shader_files = {}
+    for f in os.listdir(shader_library_path):
+        if f.endswith('.blend'):
+            shader_files[f.lower()] = f
+            
+    target_file = f"{shader_name}.blend"
+    if target_file in shader_files:
+        original_filename = shader_files[target_file.lower()]
+        return os.path.join(shader_library_path, original_filename), None
+    
+    for original_filename in shader_files.values():
+        if shader_name.lower() in original_filename.lower():
+            return os.path.join(shader_library_path, original_filename), None
+        
+    return None, f"No shader file found for {shader_name}"
+
+def get_best_material_from_blend(blend_path, params):
+    materials = []
+    with bpy.data.libraries.load(blend_path, link=False) as (data_from, data_to):
+        for mat_name in data_from.materials:
+            if "stroke" and "dev" not in mat_name.lower():
+                materials.append(mat_name)
+    
+    valid_params = set()
+    for key, value in params.items():
+        if value == 0 or (isinstance(value, str) and value.upper() == "NONE"):
+            continue
+        valid_params.add(str(key))
+        valid_params.add(str(value))
+    
+    theoretical_best = []
+    parameter_combinations = []
+    basic_mats = []
+    tint_mask_mats = []
+    default_mats = []
+    no_paren_mats = []
+    
+    for mat in materials:
+        upper_mat = mat.upper()
+        
+        if "(" in mat and ")" in mat:
+            content = mat.split("(")[1].split(")")[0]
+            
+            if "+" in content:
+                params_in_name = [p.strip() for p in content.split("+")]
+                if all(param in valid_params for param in params_in_name):
+                    parameter_combinations.append(mat)
+                    continue
+            
+            elif content in valid_params:
+                theoretical_best.append(mat)
+                continue
+        
+        if "(BASIC)" in upper_mat:
+            basic_mats.append(mat)
+        elif "(TINT_MASK)" in upper_mat:
+            tint_mask_mats.append(mat)
+        elif "(DEFAULT)" in upper_mat:
+            default_mats.append(mat)
+        elif "(" not in mat or ")" not in mat:
+            no_paren_mats.append(mat)
+    
+    if parameter_combinations:
+        return parameter_combinations[0]
+    elif theoretical_best:
+        return theoretical_best[0]
+    elif basic_mats:
+        return basic_mats[0]
+    elif tint_mask_mats:
+        return tint_mask_mats[0]
+    elif default_mats:
+        return default_mats[0]
+    elif no_paren_mats:
+        return no_paren_mats[0]
+    elif materials:
+        return materials[0]
+    
+    return None
+
 def strtobool (val):
     if not isinstance(val, str):
         return val
@@ -202,9 +316,7 @@ def get_color_space(source):
     return 'sRGB'
 
 def find_internal_path(path):
-    print(path)
     index = path.find("Lotus")
-    print(index)
     if index == -1:
         return ""
     extracted = path[index:]
@@ -219,6 +331,14 @@ def find_internal_path(path):
             ext = parts[-1]
             if ext.isalpha() and 1 <= len(ext) <= 5:
                 extracted = os.path.dirname(extracted)
+    
+    return extracted
+
+def find_internal_texture_path(path):
+    index = path.find("Lotus")
+    if index == -1:
+        return ""
+    extracted = path[index:]
     
     return extracted
 
@@ -248,6 +368,9 @@ def set_default(input_socket, value):
         input_socket.default_value = tuple(value[:4])
     elif input_socket.type == 'VALUE':
         input_socket.default_value = float(value)
+    elif input_socket.type == 'INT':
+        input_socket.default_value = int(value)
+        
 def reset_default(input_socket):
     socket_name = input_socket.name
     if socket_name in special_reset_rules:
@@ -263,17 +386,22 @@ def reset_default(input_socket):
         input_socket.default_value = tuple([0.5, 0.5, 0.5, 1])
     elif input_socket.type == 'VALUE':
         input_socket.default_value = float(0)
+    elif input_socket.type == 'INT':
+        input_socket.default_value = int(0)
                 
 def parse_material_file(filepath):
     material_data = {}
     shader_data = {}
+    hierarchy_data = {}
     with open(filepath, 'r') as f:
         for line in f:
             line = line.strip()
+            
             if not line or line.startswith('#'):
                 continue
+            if any(ignore in line for ignore in texture_ignores):
+                continue
             if '=' not in line and ':' not in line:
-                print(line)
                 continue
             if ':' in line:
                 key, value = line.split(':', 1)
@@ -286,7 +414,6 @@ def parse_material_file(filepath):
             if value == '':
                 continue
             if '_p.hlsl' in value.lower():
-                print(value)
                 key = value.lower()
                 value = 1
                 shader_data[key] = value
@@ -303,40 +430,51 @@ def parse_material_file(filepath):
             
             material_data[key] = value
             if isinstance(value, str) and not line.startswith('TX:') and "shader" not in line.lower():
-                print(key)
                 material_data[line.strip()] = 1
                 if(line.strip().lower().endswith("= none")):
                     continue
+                if(value.strip().lower().startswith("x") and len(value.strip()) == 2):
+                    material_data["x"] = int(value.strip()[-1])
                 material_data[key] = 1
                 material_data[value.strip()] = 1
     
-    for key in material_data:
-        if isinstance(material_data[key], str) and material_data[key] in special_aliases:
-            material_data[key] = special_aliases[material_data[key]]
-
-    keys = list(material_data.keys())
-    for old_key in keys:
-        if old_key in special_aliases:
-            new_key = special_aliases[old_key]
-            if old_key != new_key:
-                material_data[new_key] = material_data.pop(old_key)
+    for key in special_aliases:
+        if key in material_data and special_aliases[key] not in material_data:
+            material_data[special_aliases[key]] = 1
+            
     sorted_material = OrderedDict(sorted(material_data.items(), key=lambda t: t[0]))
-    return (sorted_material, shader_data)
+    return (sorted_material, shader_data, hierarchy_data)
 
-def connect_textures_and_parameters(material, node_group, parameters, textures, pathToTextures, texture_locations, labeled_reroutes, shader_data):
+def connect_textures_and_parameters(material, node_group, parameters, textures, pathToTextures, texture_locations, labeled_reroutes, shader_data, hierarchy_data):
     group_tree = node_group.node_tree
-    
-    if node_group.name.lower() in parameters.keys():
-        for nodegroup_to_link in bpy.data.node_groups:
-            if parameters[node_group.name.lower()] in nodegroup_to_link.name:
-                node_group.node_tree = nodegroup_to_link
-    print(group_tree.name)
-    if "Vertex Shader".lower() in group_tree.name.lower():
-        print(node_group.name)
-        print("AAA")
+    group_name_lower = group_tree.name.lower()
+    if "final tweaks" in group_name_lower:
+        return  
+     
+    if node_group.label.lower() in parameters.keys():
+        full_key = None
+        for key in parameters.keys():
+            if f"{node_group.label.lower()} =" in key:
+                full_key = key
+                print(full_key)
+                break
+        
+        if full_key:
+            search_term = full_key.split('=')[1].strip().lower()
+            for nodegroup_to_link in bpy.data.node_groups:
+                if search_term in nodegroup_to_link.name.lower():
+                    node_group.node_tree = nodegroup_to_link
+                    break
+                
+    if "vertex shader" in group_name_lower:
         for input_socket in node_group.inputs:
             if input_socket.name.lower() in shader_data:
-                set_default(input_socket, True)   
+                print(f"Setting Vertex Shader Value: {input_socket} to True")
+                set_default(input_socket, True) 
+            else:
+                print(f"Setting Vertex Shader Value: {input_socket} to False")
+                set_default(input_socket, False) 
+                  
         return     
     
     for input_socket in node_group.inputs:
@@ -356,6 +494,10 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                 for tex_name, filename in selected_list.items():
                     if(isinstance(filename, int)):
                         continue
+                    preextfilename = filename
+                    if(not filename.endswith(bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1])):
+                        filename = filename.split(".")[0] + bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]
+            
                     name = filename.split('/')[-1]
                     if any(containstexture(tex_name, input_socket.name) for link in input_socket.links):
                         try:
@@ -364,53 +506,108 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                                 if(img_tex.name in name):
                                     img = img_tex
                             if(img is None):
-                                img = bpy.data.images.load(filename)
-                            img.colorspace_settings.name = 'Non-Color'
+                                if not os.path.exists(filename) and bpy.context.scene.warframe_tools_props.USE_EXTRACTOR:
+                                    props = bpy.context.scene.warframe_tools_props
+                                    
+                                    internal_path = find_internal_texture_path(preextfilename)
+                                    texture_format = props.texture_extension.replace('*.', '').upper()
+                                    
+                                    success = extract_texture_with_cli(
+                                        props.extractor_path,
+                                        props.cache_path,
+                                        texture_format,
+                                        internal_path,
+                                        props.root
+                                    )
+                                    if success:
+                                        img = bpy.data.images.load(filename)
+                                    else:
+                                        print(f"Could not extract texture: {filename}")
+                                else:
+                                    img = bpy.data.images.load(filename)
+                            if '(sRGB)' in input_socket.name:
+                                img.colorspace_settings.name = 'sRGB'
+                            else:
+                                img.colorspace_settings.name = 'Non-Color'
+                            print(current.image)
                             if((current.image is None) or (bpy.context.scene.warframe_tools_props.REPLACE_IMAGES and current.image.name not in img.name)):
                                 current.image = img
-                            print(f"Connected texture: {filename}")
+                                print(f"Connected texture: {filename} to {input_socket.name} in {node_group.name}")
+                            break
                         except Exception as e:
                             print(f"Texture error: {str(e)}")
-        # Dunno if needed
-        if input_socket.name in parameters:
-            value = parameters[input_socket.name]
-            set_default(input_socket, value)
-        elif(bpy.context.scene.warframe_tools_props.RESET_PARAMETERS):
-            reset_default(input_socket)
+                
+                continue
+        VALID_SOCKET_TYPES = {'BOOLEAN', 'INT', 'COLOR', 'VECTOR', 'VALUE', 'RGBA'}
 
-        for name in parameters:
-            if contains(name, input_socket.name) and (input_socket.type == 'BOOLEAN' or input_socket.type == 'COLOR' or input_socket.type == 'VECTOR' or input_socket.type == 'VALUE' or input_socket.type == 'RGBA'):
-                value = None
-                try:
-                    if input_socket.name.endswith('XYZ'):
-                        value = parameters[input_socket.name.split(" ")[0].lower()]
-                    elif input_socket.name.endswith('X'):
-                        value = parameters[input_socket.name.split(" ")[0].lower()] if isinstance(parameters[input_socket.name.split(" ")[0].lower()], int) else parameters[input_socket.name.split(" ")[0].lower()][0]
-                    elif input_socket.name.endswith('Y'):
-                        value = parameters[input_socket.name.split(" ")[0].lower()] if isinstance(parameters[input_socket.name.split(" ")[0].lower()], int) else parameters[input_socket.name.split(" ")[0].lower()][1]
-                    elif input_socket.name.endswith('Z'):
-                        value = parameters[input_socket.name.split(" ")[0].lower()] if isinstance(parameters[input_socket.name.split(" ")[0].lower()], int) else parameters[input_socket.name.split(" ")[0].lower()][2]
-                    elif input_socket.name.endswith('W') or input_socket.name.endswith('Alpha'):
-                        value = parameters[input_socket.name.split(" ")[0].lower()] if isinstance(parameters[input_socket.name.split(" ")[0].lower()], int) else parameters[input_socket.name.split(" ")[0].lower()][3]
-                    else:
-                        if input_socket.name.lower().endswith("= none"):
-                            value = parameters[input_socket.name.lower()]
-                        else:
-                            value = parameters[input_socket.name.split(" ")[0].lower()]
-                    print(f"Setting instance parameter: {input_socket.name} = {value}")
-                    set_default(input_socket, value)
-                    break
-                except Exception as e:
-                    if(input_socket.name.split(" ")[0].lower() in "UvScale01".lower()):
-                        print(parameters[input_socket.name.split(" ")[0].lower()])
-                    print(input_socket.type)
-                    print(input_socket.name)
-                    print(f"Parameter error: {str(e)}")
-                    break
-            elif(bpy.context.scene.warframe_tools_props.RESET_PARAMETERS):
+        input_name = input_socket.name
+        input_lower = input_name.lower()
+        input_type = input_socket.type
+        should_reset = bpy.context.scene.warframe_tools_props.RESET_PARAMETERS
+        if input_type not in VALID_SOCKET_TYPES:
+            if should_reset:
+                reset_default(input_socket)
+            continue
+        try:
+            value = None
+            found_match = False
+            
+            lookup_name = input_lower
+            if '/' in input_name:
+                base_name, second_part = input_name.split("/", 1)
+                base_name_lower = base_name.lower()
+                second_part_lower = second_part.lower()
+                
+                for part in [base_name_lower, second_part_lower]:
+                    if part in parameters:
+                        value = parameters[part]
+                        found_match = True
+                        break
+            
+            if not found_match and any(input_name.endswith(x) for x in ('XYZ', 'X', 'Y', 'Z', 'W', 'Alpha')):
+                base_name = input_name.split(" ")[0].lower()
+                if base_name in parameters:
+                    param_val = parameters[base_name]
+                    
+                    if input_name.endswith('XYZ'):
+                        value = param_val
+                    elif input_name.endswith('X'):
+                        value = param_val if isinstance(param_val, int) else param_val[0]
+                    elif input_name.endswith('Y'):
+                        value = param_val if isinstance(param_val, int) else param_val[1]
+                    elif input_name.endswith('Z'):
+                        value = param_val if isinstance(param_val, int) else param_val[2]
+                    elif input_name.endswith(('W', 'Alpha')):
+                        value = param_val if isinstance(param_val, int) else param_val[3]
+                    found_match = True
+            if not found_match:
+                if lookup_name in parameters:
+                    value = parameters[lookup_name]
+                    found_match = True
+            if not found_match:
+                if input_lower.endswith("= none"):
+                    lookup_name = input_lower
+                elif '=' in input_lower:
+                    lookup_name = input_lower
+                else:
+                    lookup_name = input_name.split(" ")[0].lower()
+                
+                if lookup_name in parameters:
+                    value = parameters[lookup_name]
+                    found_match = True
+            
+            if found_match:
+                print(f"Setting instance parameter: {input_name} = {value}")
+                set_default(input_socket, value)
+            elif should_reset:
+                reset_default(input_socket)
+
+        except Exception as e:
+            print(f"Exception processing {input_name}: {str(e)}")
+            if should_reset:
                 reset_default(input_socket)
                                       
-def set_material_properties(material, material_data, pathToTextures, model_path, texture_locations, shader_data):
+def set_material_properties(material, material_data, pathToTextures, model_path, texture_locations, shader_data, hiearchy_data):
     parameters = {}
     textures = {}
     labeled_reroutes = []
@@ -421,25 +618,14 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
     for key, value in material_data.items():
         if key.startswith('TX:'):
             result = value
-            print(result)
             setone = False
-            if(not result.endswith(bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]) and "." in result):
-                result = result.split(".")[0] + bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]
-            
-            print(result)
             if(not "/" in result and bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION):
                 result = path + result
-                
-                print(result)
                 setone = True
             if(not result.startswith("/") and "/" in result and bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION and not setone):
                 result = path + result
-                
-                print(result)
             if(not bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION):
                 result = path + result
-                
-                print(result)
             textures[key[3:]] = result
         elif ':' in key:
             prefix, param_name = key.split(':', 1)
@@ -454,14 +640,9 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
             if(os.path.isdir(str(Path(root_loc + value)))):
                 if not value.endswith("/"):
                     value += "/"
-                print(result)
                 onlyfiles = [f for f in os.listdir(str(Path(root_loc + value))) if os.path.isfile(os.path.join(str(Path(root_loc + value)), f))]
                 for idx, file in enumerate(onlyfiles):
-                    print(root_loc)
                     texture_locations[key + " " + str(idx)] = str(Path(root_loc + value + file))
-                continue
-            elif (not str(Path(root_loc + value)).endswith(bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1])):
-                texture_locations[key] = str(Path(root_loc + value + bpy.context.scene.warframe_tools_props.texture_extension.split("*")[1]))
                 continue
             texture_locations[key] = str(Path(root_loc + value))
     elif(not bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION):
@@ -485,11 +666,9 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
                 labeled_reroutes.append(node.label)
         if node.type == 'GROUP' and node.node_tree:
             node_groups.append(node)
-    print(texture_locations)
     node_groups_for_gn = [ng for ng in bpy.data.node_groups if ng.type == 'GEOMETRY' and ng.name.startswith("Gn. ")]
     
     node_group_map = {}
-    print(parameters)
     for ng in node_groups_for_gn:
         base_name = ng.name[4:].split(maxsplit=1)[0]
         node_group_map[base_name.lower()] = ng
@@ -502,7 +681,6 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
             mod.node_group = ng
             
             for item in ng.interface.items_tree:
-                print(item)
                 if item.item_type == 'SOCKET' and item.in_out == 'INPUT':
                     socket_name = item.name
                     if socket_name.lower() in parameters:
@@ -514,10 +692,10 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
                             print(f"Setting {mod[item.identifier]} = {parameters[socket_name.lower()]}, {socket_name}")
                         except Exception as e:
                             print(f"Error setting {socket_name}: {str(e)}")
+    print(parameters)
     for node in node_groups:  
-        print(node.type)
         if node.type is not 'GEOMETRY':
-            connect_textures_and_parameters(material, node, parameters, textures, pathToTextures, texture_locations, labeled_reroutes, shader_data)
+            connect_textures_and_parameters(material, node, parameters, textures, pathToTextures, texture_locations, labeled_reroutes, shader_data, hiearchy_data)
 
 def get_shader_items(self, context):
     items = []
@@ -525,7 +703,8 @@ def get_shader_items(self, context):
         return items
     with bpy.data.libraries.load(bpy.context.scene.warframe_tools_props.pathToShader, link=False) as (data_from, data_to):
         for mat_name in data_from.materials:
-            items.append((mat_name, mat_name, ""))
+            if "dots stroke" not in mat_name.lower():
+                items.append((mat_name, mat_name, ""))
     return items
 
 def get_rig_items(self, context):
@@ -717,26 +896,6 @@ def get_color_space(source):
             return COLOR_SPACE_MAP[key]
     
     return 'sRGB'
-def bake():
-    # I hate azdfulla for making me do this
-    props = bpy.context.scene.warframe_tools_props
-    sources = []
-    
-    if props.bake_base_color:
-        sources.append('Base Color')
-    if props.bake_emission:
-        sources.append('Emission')
-    if props.bake_metalness:
-        sources.append('Metalness')
-    if props.bake_roughness:
-        sources.append('Roughness')
-    if props.bake_specular:
-        sources.append('Specular')
-    if props.bake_normal:
-        sources.append('Normal')
-    if props.bake_alpha:
-        sources.append('Alpha')
-    bpy.ops.object.bake_textures(source=",".join(sources))
     
 def normal_to_height(normal_img, iterations=5000, damping=0.1):
     """
@@ -964,76 +1123,97 @@ class SHADER_OT_append_material(bpy.types.Operator):
             return {'CANCELLED'}
 
         try:
-            obj = context.object
-            original_base_name = None
-            if obj and obj.data and hasattr(obj.data, 'materials') and obj.data.materials:
-                if obj.data.materials[0]:
-                    original_base_name = obj.data.materials[0].name.split('.')[0]
+            for obj in context.selected_objects:
+                original_base_name = None
+                if obj and obj.data and hasattr(obj.data, 'materials') and obj.data.materials:
+                    if obj.data.materials[0]:
+                        original_base_name = obj.data.materials[0].name.split('.')[0]
 
-            before = set(bpy.data.materials.keys())
-            bpy.ops.wm.append(
-                directory=os.path.join(context.scene.warframe_tools_props.pathToShader, "Material") + os.sep,
-                filename=self.material_name,
-                do_reuse_local_id=False
-            )
-            after = set(bpy.data.materials.keys())
-            new_material_names = after - before
-            
-            if not new_material_names:
-                self.report({'ERROR'}, "Failed to append material")
-                return {'CANCELLED'}
+                before = set(bpy.data.materials.keys())
                 
-            new_material = bpy.data.materials[list(new_material_names)[0]]
-            self.report({'INFO'}, f"Appended material: {self.material_name}")
-
-            gn_node_groups = []
-            try:
-                with bpy.data.libraries.load(context.scene.warframe_tools_props.pathToShader, link=False) as (data_from, data_to):
-                    gn_node_groups = [name for name in data_from.node_groups if name.startswith("Gn")]
-            except Exception as e:
-                self.report({'WARNING'}, f"Could not read node groups: {str(e)}")
-            
-            for node_group_name in gn_node_groups:
-                if node_group_name not in bpy.data.node_groups:
-                    try:
-                        bpy.ops.wm.append(
-                            directory=os.path.join(context.scene.warframe_tools_props.pathToShader, "NodeTree") + os.sep,
-                            filename=node_group_name,
-                            do_reuse_local_id=True
-                        )
-                        self.report({'INFO'}, f"Appended node group: {node_group_name}")
-                    except Exception as e:
-                        self.report({'WARNING'}, f"Failed to append node group {node_group_name}: {str(e)}")
-
-            if original_base_name:
-                old_materials = [mat for mat in bpy.data.materials 
-                                if mat.name.startswith(original_base_name + '.') or 
-                                mat.name == original_base_name]
+                before_images = set(bpy.data.images.keys())
+                print(os.path.join(context.scene.warframe_tools_props.pathToShader, "Material") + os.sep)
+                print(self.material_name)
+                bpy.ops.wm.append(
+                    directory=os.path.join(context.scene.warframe_tools_props.pathToShader, "Material") + os.sep,
+                    filename=self.material_name,
+                    do_reuse_local_id=False
+                )
+                after = set(bpy.data.materials.keys())
+                new_material_names = after - before
                 
-                for old_mat in old_materials:
-                    old_mat.user_remap(new_material)
+                if not new_material_names:
+                    self.report({'ERROR'}, "Failed to append material")
+                    return {'CANCELLED'}
                     
-                for old_mat in old_materials:
-                    if old_mat.users == 0 and old_mat != new_material:
-                        bpy.data.materials.remove(old_mat)
+                new_material = bpy.data.materials[list(new_material_names)[0]]
+                self.report({'INFO'}, f"Appended material: {self.material_name}")
+
+                after_images = set(bpy.data.images.keys())
+                new_image_names = after_images - before_images
                 
-                new_material.name = original_base_name
-            else:
-                if obj and obj.data:
-                    new_name = f"{obj.data.name}_Material"
-                    new_material.name = new_name
+                self.cleanup_textures(new_material, new_image_names)
+                gn_node_groups = []
+                try:
+                    with bpy.data.libraries.load(context.scene.warframe_tools_props.pathToShader, link=False) as (data_from, data_to):
+                        gn_node_groups = [name for name in data_from.node_groups if name.startswith("Gn")]
+                except Exception as e:
+                    self.report({'WARNING'}, f"Could not read node groups: {str(e)}")
+                
+                for node_group_name in gn_node_groups:
+                    if node_group_name not in bpy.data.node_groups:
+                        try:
+                            bpy.ops.wm.append(
+                                directory=os.path.join(context.scene.warframe_tools_props.pathToShader, "NodeTree") + os.sep,
+                                filename=node_group_name,
+                                do_reuse_local_id=True
+                            )
+                            self.report({'INFO'}, f"Appended node group: {node_group_name}")
+                        except Exception as e:
+                            self.report({'WARNING'}, f"Failed to append node group {node_group_name}: {str(e)}")
+
+                if original_base_name:
+                    old_materials = [mat for mat in bpy.data.materials 
+                                    if mat.name.startswith(original_base_name + '.') or 
+                                    mat.name == original_base_name]
                     
-                    if not obj.data.materials:
-                        obj.data.materials.append(new_material)
-                    else:
-                        obj.data.materials[0] = new_material
+                    for old_mat in old_materials:
+                        old_mat.user_remap(new_material)
+                        
+                    for old_mat in old_materials:
+                        if old_mat.users == 0 and old_mat != new_material:
+                            bpy.data.materials.remove(old_mat)
+                    
+                    new_material.name = original_base_name
+                else:
+                    if obj and obj.data:
+                        new_name = f"{obj.data.name}_Material"
+                        new_material.name = new_name
+                        
+                        if not obj.data.materials:
+                            obj.data.materials.append(new_material)
+                        else:
+                            obj.data.materials[0] = new_material
 
         except Exception as e:
             self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
 
         return {'FINISHED'}
-    
+    def cleanup_textures(self, material, new_image_names):
+        """Remove texture files associated with the material"""
+        if not material.use_nodes:
+            return
+        unused_images = new_image_names
+        
+        for image_name in unused_images:
+            image = bpy.data.images.get(image_name)
+            if image:
+                try:
+                    bpy.data.images.remove(image)
+                    self.report({'INFO'}, f"Removed unused image: {image_name}")
+                except Exception as e:
+                    self.report({'WARNING'}, f"Could not remove image {image_name}: {str(e)}")
     def draw(self, context):
         layout = self.layout
         layout.label(text="Select Material to Append")
@@ -1157,21 +1337,6 @@ class RIG_OT_append_rig(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self, width=300)
 
 
-def menu_func(self, context):
-    self.layout.operator(SHADER_OT_append_material.bl_idname)
-
-def register_shader():
-    bpy.ops.shader.append_material('INVOKE_DEFAULT')
-
-def unregister_shader():
-    bpy.utils.unregister_class(SHADER_OT_append_material)
-def register_rig():
-    bpy.ops.rig.append_rig('INVOKE_DEFAULT')
-
-def unregister_rig():
-    bpy.utils.unregister_class(RIG_OT_append_rig)
-
-
 def process_object(obj):
     if obj.type != 'MESH':
         return
@@ -1231,10 +1396,13 @@ def process_object(obj):
         bm.to_mesh(me)
         bm.free()
     me.shade_smooth()
-
-def run_setup():
-    mode = bpy.context.scene.warframe_tools_props.mode
-    if mode == 'IMPORT':
+class WARFRAME_OT_ImportModel(bpy.types.Operator):
+    bl_idname = "wm.import_model"
+    bl_label = "Import Model"
+    bl_description = "Import and process Warframe model"
+    
+    def execute(self, context):
+        props = context.scene.warframe_tools_props
         bpy.ops.import_scene.gltf(
             filepath=str(bpy.context.scene.warframe_tools_props.model_file_path), 
             guess_original_bind_pose=False, 
@@ -1268,28 +1436,68 @@ def run_setup():
                         collection.objects.unlink(obj)
                     new_collection.objects.link(obj)
             process_object(obj)
-            obj.select_set(False)
-            print(obj.data.validate(clean_customdata=True))
         collections_dict = {}
             
-    elif mode == 'APPEND':
-        register_shader()
-    elif mode == 'RIG':
-        register_rig()
-    elif mode == 'BAKE':
-        bake()
-    elif mode == 'SHADER':
-        mat = bpy.context.object.active_material
+        self.report({'INFO'}, "Model imported successfully")
+        return {'FINISHED'}
+class WARFRAME_OT_SetupShader(bpy.types.Operator):
+    bl_idname = "wm.setup_shader"
+    bl_label = "Setup Shader"
+    bl_description = "Configure material with textures and parameters"
+    
+    def execute(self, context):
+        props = context.scene.warframe_tools_props
+        mat = context.object.active_material
         if not mat:
-            raise Exception("No active material selected")
+            self.report({'ERROR'}, "No active material selected")
+            return {'CANCELLED'}
+            
         texture_locations = {}
-        (material_data, shader_data) = parse_material_file(bpy.context.scene.warframe_tools_props.material_file_path)
-        model_path = find_internal_path(bpy.context.scene.warframe_tools_props.material_file_path)
-        print(model_path)
-        print("!!!!")
-        set_material_properties(mat, material_data, bpy.context.scene.warframe_tools_props.pathToTextures, model_path, texture_locations, shader_data)
+        material_data, shader_data, hierarchy_data = parse_material_file(props.material_file_path)
+        model_path = find_internal_path(props.material_file_path)
         
-        
+        set_material_properties(mat, material_data, props.pathToTextures, model_path, texture_locations, shader_data, hierarchy_data)
+        self.report({'INFO'}, "Shader setup completed")
+        return {'FINISHED'}    
+class WM_OT_RunSetup(bpy.types.Operator):
+    bl_idname = "wm.run_setup"
+    bl_label = "Run Setup"
+
+    def execute(self, context):
+        props = context.scene.warframe_tools_props
+            
+        mode = props.mode
+        if mode == 'IMPORT':
+            return bpy.ops.wm.import_model('INVOKE_DEFAULT')
+        elif mode == 'APPEND':
+            return bpy.ops.shader.append_material('INVOKE_DEFAULT')
+        elif mode == 'RIG':
+            return bpy.ops.rig.append_rig('INVOKE_DEFAULT')
+        elif mode == 'BAKE':
+            # I hate azdfulla for making me do this
+            sources = []
+            if props.bake_base_color:
+                sources.append('Base Color')
+            if props.bake_emission:
+                sources.append('Emission')
+            if props.bake_metalness:
+                sources.append('Metalness')
+            if props.bake_roughness:
+                sources.append('Roughness')
+            if props.bake_specular:
+                sources.append('Specular')
+            if props.bake_normal:
+                sources.append('Normal')
+            if props.bake_alpha:
+                sources.append('Alpha')
+            return bpy.ops.object.bake_textures(source=",".join(sources))
+        elif mode == 'SHADER':
+            return bpy.ops.wm.setup_shader('INVOKE_DEFAULT')
+        elif mode == 'EXPERIMENTAL':
+            return bpy.ops.wm.experimental_mode('INVOKE_DEFAULT')
+            
+        self.report({'WARNING'}, "Unknown mode selected")
+        return {'CANCELLED'}
 class WM_OT_SetupPaths(bpy.types.Operator):
     bl_idname = "wm.setup_paths"
     bl_label = "Setup Required Paths"
@@ -1298,6 +1506,9 @@ class WM_OT_SetupPaths(bpy.types.Operator):
     current_step: bpy.props.IntProperty(default=0)
     material_file_path: bpy.props.StringProperty(subtype='FILE_PATH')
     model_file_path: bpy.props.StringProperty(subtype='FILE_PATH')
+    extractor_path: bpy.props.StringProperty(subtype='FILE_PATH')
+    cache_path: bpy.props.StringProperty(subtype='DIR_PATH')
+    shader_library_path: bpy.props.StringProperty(subtype='DIR_PATH')
     pathToShader: bpy.props.StringProperty(subtype='FILE_PATH')
     pathToRig: bpy.props.StringProperty(subtype='FILE_PATH')
     root: bpy.props.StringProperty(subtype='DIR_PATH')
@@ -1321,8 +1532,17 @@ class WM_OT_SetupPaths(bpy.types.Operator):
                 steps.append(('pathToRig', 'Select Rig Blend File', 'file', '*.blend'))
         elif mode == 'BAKE':
             return steps
-        elif mode == 'EXPERIMENTAL':
+        elif mode == '3DPRINT':
             steps.append(('normal_to_height_path', 'Select Normal Map File', 'file', '*'))
+        elif mode == 'EXPERIMENTAL':
+            steps.append(('model_file_path', 'Select Model File (.glb)', 'file', '*.glb'))
+            steps.append(('shader_library_path', 'Select Shader Library Folder', 'directory', ''))
+            self.root = bpy.context.scene.warframe_tools_props.root
+            if bpy.context.scene.warframe_tools_props.USE_ROOT_LOCATION and (self.root is None or self.root is ""):
+                steps.append(('root', 'Select Root Directory', 'directory', ''))
+            if bpy.context.scene.warframe_tools_props.USE_EXTRACTOR:
+                steps.append(('extractor_path', 'Select Extractor CLI', 'file', '*'))
+                steps.append(('cache_path', 'Select Cache Folder', 'directory', ''))
         elif mode == 'SHADER':
             steps.append(('material_file_path', 'Select Material File (.txt)', 'file', '*.txt'))
             self.root = bpy.context.scene.warframe_tools_props.root
@@ -1340,6 +1560,16 @@ class WM_OT_SetupPaths(bpy.types.Operator):
         self.current_step = 0
         self.filepath = ""
         self.directory = str(Path.home())
+        self.material_file_path = ""
+        self.model_file_path = ""
+        self.extractor_path = ""
+        self.cache_path = ""
+        self.shader_library_path = ""
+        self.pathToShader = ""
+        self.pathToRig = ""
+        self.root = ""
+        self.pathToTextures = ""
+        self.normal_to_height_path = ""
         return self.execute(context)
     
     def execute(self, context):
@@ -1348,6 +1578,14 @@ class WM_OT_SetupPaths(bpy.types.Operator):
                 bpy.context.scene.warframe_tools_props.material_file_path = self.material_file_path
             if self.model_file_path:
                 bpy.context.scene.warframe_tools_props.model_file_path = self.model_file_path
+            if self.extractor_path:
+                bpy.context.scene.warframe_tools_props.extractor_path = self.extractor_path
+            if self.cache_path:
+                bpy.context.scene.warframe_tools_props.cache_path = self.cache_path
+            if self.shader_library_path:
+                bpy.context.scene.warframe_tools_props.shader_library_path = self.shader_library_path
+            if self.pathToTextures:
+                bpy.context.scene.warframe_tools_props.pathToTextures = self.pathToTextures
             if self.pathToRig:
                 bpy.context.scene.warframe_tools_props.rig_path = self.pathToRig
             if self.pathToShader:
@@ -1358,9 +1596,7 @@ class WM_OT_SetupPaths(bpy.types.Operator):
                 bpy.context.scene.warframe_tools_props.root = self.root
             if self.pathToTextures:
                 bpy.context.scene.warframe_tools_props.pathToTextures = self.pathToTextures
-            run_setup()
-            self.report({'INFO'}, "Setup Completed Successfully!")
-            return {'FINISHED'}
+            return bpy.ops.wm.run_setup('INVOKE_DEFAULT')
         
         step = self.steps[self.current_step]
         step_id, label, step_type, filter_glob = step
@@ -1421,7 +1657,181 @@ class WM_OT_SetupPaths(bpy.types.Operator):
                 if current_value:
                     name = os.path.basename(current_value)
                     row.label(text=name, icon='CHECKMARK')
+                    
+class WARFRAME_OT_ExperimentalMode(bpy.types.Operator):
+    bl_idname = "wm.experimental_mode"
+    bl_label = "Experimental Mode"
+    bl_description = "Import model and auto-setup materials from MaterialPath"
+    
+    def execute(self, context):
+        
+        start_time = time.time()
+        props = context.scene.warframe_tools_props
+        set_up_mats = []
+        bpy.ops.wm.import_model('EXEC_DEFAULT')
+        
+        for obj in context.selected_objects:
+            if obj.type != 'MESH':
+                continue
+            if(obj.data.materials[0].name.split('.')[0] in set_up_mats):
+                continue    
+            material_path = obj.data.materials[0].get('FullPath')
+            if not material_path:
+                set_up_mats.append(obj.data.materials[0].name.split('.')[0])
+                self.report({'WARNING'}, f"Object {obj.name} has no FullPath custom property")
+                continue
+            
+            internal_path = find_internal_path(material_path) #возможно не надо
+            material_file_path = os.path.join(props.root, internal_path) + ".txt"
+            
+            if not os.path.exists(material_file_path):
+                if props.USE_EXTRACTOR:
+                    success = extract_material_with_cli(
+                        props.extractor_path,
+                        props.cache_path,
+                        internal_path,
+                        props.root
+                    )
+                    if not success:
+                        self.report({'ERROR'}, f"Failed to extract material: {internal_path}")
+                        set_up_mats.append(obj.data.materials[0].name.split('.')[0])
+                        continue
+                else:
+                    self.report({'WARNING'}, f"Material file not found: {material_file_path}")
+                    set_up_mats.append(obj.data.materials[0].name.split('.')[0])
+                    continue
+            
+            try:
+                material_data, shader_data, hierarchy_data = parse_material_file(material_file_path)
+            except Exception as e:
+                self.report({'ERROR'}, f"Failed to parse material file: {str(e)}")
+                set_up_mats.append(obj.data.materials[0].name.split('.')[0])
+                continue
+            
+            shader_name = None
+            for key in shader_data:
+                if isinstance(key, str) and '_p.hlsl' in key:
+                    shader_name = key.split('_p.hlsl')[0].split("/")[-2]
+                    break
+            
+            if not shader_name:
+                self.report({'WARNING'}, f"No shader found in material file: {material_file_path}")
+                set_up_mats.append(obj.data.materials[0].name.split('.')[0])
+                continue
+            print(f"Found shader name: {shader_name}")
+            shader_blend_path, error = find_shader_material(shader_name, props.shader_library_path)
+            if error:
+                self.report({'ERROR'}, error)
+                set_up_mats.append(obj.data.materials[0].name.split('.')[0])
+                continue
+            
+            print(f"Found shader: {shader_blend_path}")
+            material_name = get_best_material_from_blend(shader_blend_path, material_data)
+            if not material_name:
+                self.report({'ERROR'}, f"No suitable material found in {shader_blend_path}")
+                set_up_mats.append(obj.data.materials[0].name.split('.')[0])
+                continue
+            print(f"Chosen material: {material_name}")
+            original_base_name = None
+            if obj and obj.data and hasattr(obj.data, 'materials') and obj.data.materials:
+                if obj.data.materials[0]:
+                    original_base_name = obj.data.materials[0].name.split('.')[0]
 
+            before = set(bpy.data.materials.keys())
+            
+            before_images = set(bpy.data.images.keys())
+            bpy.ops.wm.append(
+                directory=os.path.join(shader_blend_path, "Material") + os.sep,
+                filename=material_name,
+                do_reuse_local_id=False
+            )
+            after = set(bpy.data.materials.keys())
+            new_material_names = after - before
+            
+            if not new_material_names:
+                self.report({'ERROR'}, "Failed to append material")
+                set_up_mats.append(obj.data.materials[0].name.split('.')[0])
+                continue
+                
+            new_material = bpy.data.materials[list(new_material_names)[0]]
+            self.report({'INFO'}, f"Appended material: {material_name}")
+
+            after_images = set(bpy.data.images.keys())
+            new_image_names = after_images - before_images
+            
+            self.cleanup_textures(new_material, new_image_names) #change
+            gn_node_groups = []
+            try:
+                with bpy.data.libraries.load(context.scene.warframe_tools_props.pathToShader, link=False) as (data_from, data_to):
+                    gn_node_groups = [name for name in data_from.node_groups if name.startswith("Gn") and name not in data_to.node_groups]
+            except Exception as e:
+                self.report({'WARNING'}, f"Could not read node groups: {str(e)}")
+            
+            for node_group_name in gn_node_groups:
+                if node_group_name not in bpy.data.node_groups:
+                    try:
+                        bpy.ops.wm.append(
+                            directory=os.path.join(context.scene.warframe_tools_props.pathToShader, "NodeTree") + os.sep,
+                            filename=node_group_name,
+                            do_reuse_local_id=True
+                        )
+                        self.report({'INFO'}, f"Appended node group: {node_group_name}")
+                    except Exception as e:
+                        self.report({'WARNING'}, f"Failed to append node group {node_group_name}: {str(e)}")
+
+            if original_base_name:
+                old_materials = [mat for mat in bpy.data.materials 
+                                if mat.name.startswith(original_base_name + '.') or 
+                                mat.name == original_base_name]
+                
+                for old_mat in old_materials:
+                    old_mat.user_remap(new_material)
+                    
+                for old_mat in old_materials:
+                    if old_mat.users == 0 and old_mat != new_material:
+                        bpy.data.materials.remove(old_mat)
+                
+                new_material.name = original_base_name
+            else:
+                if obj and obj.data:
+                    new_name = f"{obj.data.name}_Material"
+                    new_material.name = new_name
+                    
+                    if not obj.data.materials:
+                        obj.data.materials.append(new_material)
+                    else:
+                        obj.data.materials[0] = new_material
+            
+            texture_locations = {}
+            
+            model_path = find_internal_path(material_file_path)
+            set_material_properties(new_material, material_data, props.pathToTextures, 
+                                  model_path, texture_locations, shader_data, hierarchy_data)
+                                  
+            set_up_mats.append(obj.data.materials[0].name.split('.')[0])
+            
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            minutes, seconds = divmod(elapsed_time, 60)
+            
+            self.report({'INFO'}, f"Setup completed in {int(minutes)}m {seconds:.2f}s")
+            self.report({'INFO'}, f"Set up material for {obj.name}")
+        
+        return {'FINISHED'}
+    def cleanup_textures(self, material, new_image_names):
+        if not material.use_nodes:
+            return
+        unused_images = new_image_names
+        
+        for image_name in unused_images:
+            image = bpy.data.images.get(image_name)
+            if image:
+                try:
+                    bpy.data.images.remove(image)
+                    self.report({'INFO'}, f"Removed unused image: {image_name}")
+                except Exception as e:
+                    self.report({'WARNING'}, f"Could not remove image {image_name}: {str(e)}")
+    
 class WarframeAutoPorter(bpy.types.AddonPreferences):
     # This must match the add-on name, use `__package__`
     # when defining this for add-on extensions or a sub-module of a python package.
@@ -1499,17 +1909,6 @@ def get_image_items(self, context):
         items.append(('NONE', 'No Images', ""))
     return items
 
-class OBJECT_OT_addon_prefs_example(bpy.types.Operator):
-    """Display example preferences"""
-    bl_idname = "object.addon_prefs_example"
-    bl_label = "Add-on Preferences Example"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, context):
-        preferences = context.preferences
-        addon_prefs = preferences.addons[__name__].preferences
-
-        return {'FINISHED'}
 class BakeSourceItem(bpy.types.PropertyGroup):
     name: StringProperty()
     value: BoolProperty(name="", default=False)
@@ -1526,7 +1925,7 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
     name="Import Level",
     description="Due to differences, level import is slightly different. Choose it if you import levels",
     default=False
-)
+)    
     USE_PATHS: BoolProperty(
     name="Enable automatic paths",
     description="If deselected - new fields with required paths will appear",
@@ -1545,7 +1944,7 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
     RESET_PARAMETERS: BoolProperty(
     name="Reset Parameters",
     description="Sets values that do not exist in the mat txt file to 0, gray, etc. Useful if there are parameters that a set to true but don't exist in your mat file",
-    default=False
+    default=True
 )
     invert_green: BoolProperty(
     name="Invert green",
@@ -1604,6 +2003,23 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
     description="Width of the baked texture",
     default=2048
 )
+    USE_EXTRACTOR: BoolProperty(
+    name="Use Extractor",
+    description="Use extractor to try and set everything up in one go.",
+    default=False
+)
+    extractor_path: StringProperty(
+    name="Extractor CLI Path",
+    description=r"Path to the CLI Extractor to use.",
+    default=r"D:\Extractor\Warframe-Extractor-CLI.exe",
+    subtype='FILE_PATH'
+)
+    cache_path: StringProperty(
+    name="Cache Folder Path",
+    description=r"Path to the warframe cache folder (e.g., D:\Warframe\Cache.Windows)",
+    default=r"",
+    subtype='DIR_PATH'
+)
     material_file_path: StringProperty(
     name="Material File Path",
     description=r"Material txt file path (e.g., D:\tmp\Assets\Lotus\Objects\Duviri\Props\DominitiusThraxThroneA.txt)",
@@ -1619,7 +2035,7 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
     pathToShader: StringProperty(
     name="Shader Path",
     description=r"Shader .blend path (e.g., D:\Download\PBRFillDeferred.blend)",
-    default=r"E:\Download\PBRFillDeferred(5).blend",
+    default=r"E:\Download\PBRFillDeferred.blend",
     subtype='FILE_PATH'
 )
     pathToTextures: StringProperty(
@@ -1676,6 +2092,12 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
         description="Select an image from the blend file",
         items=get_image_items
 )
+    shader_library_path: StringProperty(
+        name="Shader Library Path",
+        description="Path to the folder containing .blend files with shaders",
+        subtype='DIR_PATH',
+        default=""
+)
     mode: EnumProperty(
     name="Mode",
     items=[
@@ -1684,9 +2106,10 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
         ('SHADER', "Shader Setup Mode", "Set up the shader parameters and textures"),
         ('RIG', "Rig Setup Mode", "Set up the rig for characters"),
         ('BAKE', "Baking Mode", "Bake the textures for the selected object"),
-        ('EXPERIMENTAL', "Experimental Mode", "Things for 3d printing and stuff"),
+        ('3DPRINT', "3d Printing Mode", "Things for 3d printing and stuff"),
+        ('EXPERIMENTAL', "Experimental Mode", "Import model and auto-setup materials from MaterialPath"),
     ],
-    default='SHADER'
+    default='EXPERIMENTAL'
 )
  
 class WARFRAME_PT_SetupPanel(bpy.types.Panel):
@@ -1711,21 +2134,35 @@ class WARFRAME_PT_SetupPanel(bpy.types.Panel):
         if props.mode == 'IMPORT':
             box.prop(props, "USE_PATHS")
             box.prop(props, "LEVEL_IMPORT")
+            box.prop(props, "USE_EXTRACTOR")
             if not props.USE_PATHS: 
                 box.prop(props, "model_file_path")
-            layout.operator("wm.run_setup", text="Import")
+                box.prop(props, "extractor_path")
+                box.prop(props, "cache_path")
+            
+            if props.USE_PATHS:
+                layout.operator("wm.setup_paths", text="Import")
+            else:
+                layout.operator("wm.run_setup", text="Import")
             return
         if props.mode == 'APPEND':
             box.prop(props, "USE_PATHS")
             if not props.USE_PATHS: 
                 box.prop(props, "pathToShader")
-            layout.operator("wm.run_setup", text="Append Shader")
+            
+            if props.USE_PATHS:
+                layout.operator("wm.setup_paths", text="Run Setup")
+            else:
+                layout.operator("wm.run_setup", text="Run Setup")
             return
         if props.mode == 'RIG':
             box.prop(props, "USE_PATHS")
             if not props.USE_PATHS: 
                 box.prop(prefs, "rig_preference")
-            layout.operator("wm.run_setup", text="Setup Rig")
+            if props.USE_PATHS:
+                layout.operator("wm.setup_paths", text="Run Setup")
+            else:
+                layout.operator("wm.run_setup", text="Run Setup")
             return
         if props.mode == 'BAKE':
             box.prop(props, "USE_PATHS")
@@ -1748,10 +2185,12 @@ class WARFRAME_PT_SetupPanel(bpy.types.Panel):
             row = box.row(align=True)
             row.prop(props, "bake_height")
             row.prop(props, "bake_width")
-            layout.operator("wm.run_setup", text="Bake")
+            if props.USE_PATHS:
+                layout.operator("wm.setup_paths", text="Run Setup")
+            else:
+                layout.operator("wm.run_setup", text="Run Setup")
             return
-        if props.mode == 'EXPERIMENTAL':
-            box.label(text="3d print stuff")
+        if props.mode == '3DPRINT':
             box.prop(props, "separate_mode")
             convert = box.box()
             convert.prop(props, "normal_to_height_path")
@@ -1782,10 +2221,33 @@ class WARFRAME_PT_SetupPanel(bpy.types.Panel):
                 row = box.row()
                 row.operator("dprint.run_all_operations", text="Run All Operations")
             return
+        if props.mode == 'EXPERIMENTAL':
+            box.prop(props, "USE_PATHS")
+            box.prop(props, "USE_EXTRACTOR")
+            box.prop(props, "LEVEL_IMPORT")
+            box.prop(props, "RESET_PARAMETERS")
+            if not props.USE_PATHS: 
+                box.prop(props, "model_file_path")
+                box.prop(props, "extractor_path")
+                box.prop(props, "cache_path")
+                box.prop(props, "shader_library_path")
+            box.prop(props, "USE_ROOT_LOCATION")
+            if not props.USE_PATHS and props.USE_ROOT_LOCATION: 
+                box.prop(prefs, "root_preference")
+            
+            if props.USE_PATHS:
+                layout.operator("wm.setup_paths", text="Run Experimental Setup")
+            else:
+                layout.operator("wm.run_setup", text="Run Experimental Setup")
+            return
         if props.mode == 'SHADER':
             box.prop(props, "USE_PATHS")
+            
+            box.prop(props, "USE_EXTRACTOR")
             if not props.USE_PATHS: 
                 box.prop(props, "material_file_path")
+                box.prop(props, "extractor_path")
+                box.prop(props, "cache_path")
             box.prop(props, "USE_ROOT_LOCATION")
             if not props.USE_PATHS and not props.USE_ROOT_LOCATION: box.prop(props, "pathToTextures")
             elif not props.USE_PATHS and props.USE_ROOT_LOCATION: box.prop(prefs, "root_preference") 
@@ -1793,24 +2255,18 @@ class WARFRAME_PT_SetupPanel(bpy.types.Panel):
             box.prop(props, "REPLACE_IMAGES")
             box.prop(props, "RESET_PARAMETERS")
             box.prop(props, "texture_extension")
-        layout.operator("wm.run_setup", text="Run Setup")
-
-class WM_OT_RunSetup(bpy.types.Operator):
-    bl_idname = "wm.run_setup"
-    bl_label = "Run Setup"
-
-    def execute(self, context):
-        if bpy.context.scene.warframe_tools_props.USE_PATHS:
-            bpy.ops.wm.setup_paths('INVOKE_DEFAULT')
+        if props.USE_PATHS:
+            layout.operator("wm.setup_paths", text="Run Setup")
         else:
-            run_setup()
-            self.report({'INFO'}, "Setup Completed Successfully!")
-        return {'FINISHED'}
+            layout.operator("wm.run_setup", text="Run Setup")
 
 classes = (
     WarframeAutoPorter,
     WARFRAME_PT_SetupPanel,
     WM_OT_RunSetup,
+    WARFRAME_OT_SetupShader,
+    WARFRAME_OT_ImportModel,
+    WARFRAME_OT_ExperimentalMode,
     WM_OT_SetupPaths,
     SHADER_OT_append_material,
     NormalToHeightOperator,
