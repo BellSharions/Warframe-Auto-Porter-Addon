@@ -172,7 +172,7 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                         try:
                             img = None
                             for img_tex in bpy.data.images:
-                                if(img_tex.name in name):
+                                if(img_tex.name == name):
                                     img = img_tex
                             if(img is None):
                                 if not os.path.exists(filename) and bpy.context.scene.warframe_tools_props.USE_EXTRACTOR:
