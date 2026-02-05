@@ -2,6 +2,7 @@ import subprocess
 import os
 import re
 import ast
+import bmesh
 from pathlib import Path
 from collections import OrderedDict
 import bpy
