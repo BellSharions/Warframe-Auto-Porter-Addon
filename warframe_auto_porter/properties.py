@@ -264,7 +264,7 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
             ('IMPORT', 'Import Model', 'Import model from file'),
             ('APPEND', 'Append Shader', 'Append shader from file'),
             ('SHADER', 'Setup Shader', 'Setup shader with material file'),
-            ('EXPERIMENTAL', 'Experimental', 'Experimental mode'),
+            ('EXPERIMENTAL', 'Auto Setup', 'Auto Setup mode'),
             ('RIG', 'Append Rig', 'Append rig from file'),
             ('BAKE', 'Bake Textures', 'Bake textures from active material'),
             ('3DPRINT', '3D Print', '3D Print operations'),

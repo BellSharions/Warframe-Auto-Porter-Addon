@@ -1014,7 +1014,7 @@ class WM_OT_SetupPaths(bpy.types.Operator):
 
 class WARFRAME_OT_ExperimentalMode(bpy.types.Operator):
     bl_idname = "wm.experimental_mode"
-    bl_label = "Experimental Mode"
+    bl_label = "Auto Setup Mode"
     bl_description = "Import model and auto-setup materials from MaterialPath"
 
     def execute(self, context):

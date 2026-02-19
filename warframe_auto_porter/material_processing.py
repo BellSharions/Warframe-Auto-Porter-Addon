@@ -251,6 +251,7 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                     found_match = True
             if not found_match:
                 if lookup_name in parameters:
+                    print(lookup_name)
                     value = parameters[lookup_name]
                     found_match = True
             if not found_match:
@@ -262,6 +263,7 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                     lookup_name = input_name.split(" ")[0].lower()
 
                 if lookup_name in parameters:
+                    print(lookup_name)
                     value = parameters[lookup_name]
                     found_match = True
 

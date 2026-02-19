@@ -128,9 +128,9 @@ class WARFRAME_PT_SetupPanel(bpy.types.Panel):
                 box.prop(prefs, "root_preference")
 
             if props.USE_PATHS:
-                layout.operator("wm.setup_paths", text="Run Experimental Setup")
+                layout.operator("wm.setup_paths", text="Run Auto Setup")
             else:
-                layout.operator("wm.run_setup", text="Run Experimental Setup")
+                layout.operator("wm.run_setup", text="Run Auto Setup")
             return
         if props.mode == 'SHADER':
             box.prop(props, "USE_PATHS")
