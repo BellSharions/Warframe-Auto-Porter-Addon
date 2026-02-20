@@ -1,9 +1,9 @@
 import bpy
 
 
-class WARFRAME_PT_SetupPanel(bpy.types.Panel):
+class SetupPanelOperator(bpy.types.Panel):
     bl_label = "Warframe Model Setup"
-    bl_idname = "WARFRAME_PT_SetupPanel"
+    bl_idname = "SetupPanelOperator"
     bl_description = "Panel for setting up warframe models"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'

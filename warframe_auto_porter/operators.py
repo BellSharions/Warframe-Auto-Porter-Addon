@@ -146,7 +146,7 @@ def cleanup_bake(state):
             print(f"Error restoring connection: {e}")
 
 
-class OBJECT_OT_CreateBakedMaterial(bpy.types.Operator):
+class CreateBakedMaterialOperator(bpy.types.Operator):
     bl_idname = "object.create_baked_material"
     bl_label = "Create Baked Material"
     bl_description = "Create a basic Principled BSDF material with baked textures"
@@ -233,7 +233,7 @@ class OBJECT_OT_CreateBakedMaterial(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class OBJECT_OT_BakeTextures(bpy.types.Operator):
+class BakeTexturesOperator(bpy.types.Operator):
     bl_idname = "object.bake_textures"
     bl_label = "Bake Textures"
     bl_options = {'REGISTER', 'UNDO'}
@@ -567,7 +567,7 @@ class RunAllOperationsOperator(bpy.types.Operator):
             return {'CANCELLED'}
 
 
-class SHADER_OT_append_material(bpy.types.Operator):
+class AppendMaterialOperator(bpy.types.Operator):
     bl_idname = "shader.append_material"
     bl_label = "Append Shader"
     bl_description = "Append material from shader library"
@@ -685,7 +685,7 @@ class SHADER_OT_append_material(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self, width=300)
 
 
-class RIG_OT_append_rig(bpy.types.Operator):
+class AppendRigOperator(bpy.types.Operator):
     bl_idname = "rig.append_rig"
     bl_label = "Append Rig"
     bl_description = "Append rig and do automatic setup"
@@ -799,7 +799,7 @@ class RIG_OT_append_rig(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self, width=300)
 
 
-class WARFRAME_OT_ImportModel(bpy.types.Operator):
+class ImportModelOperator(bpy.types.Operator):
     bl_idname = "wm.import_model"
     bl_label = "Import Model"
     bl_description = "Import and process Warframe model"
@@ -845,7 +845,7 @@ class WARFRAME_OT_ImportModel(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class WARFRAME_OT_SetupShader(bpy.types.Operator):
+class SetupShaderOperator(bpy.types.Operator):
     bl_idname = "wm.setup_shader"
     bl_label = "Setup Shader"
     bl_description = "Configure material with textures and parameters"
@@ -866,7 +866,7 @@ class WARFRAME_OT_SetupShader(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class WM_OT_RunSetup(bpy.types.Operator):
+class RunSetupOperator(bpy.types.Operator):
     bl_idname = "wm.run_setup"
     bl_label = "Run Setup"
 
@@ -907,7 +907,7 @@ class WM_OT_RunSetup(bpy.types.Operator):
         return {'CANCELLED'}
 
 
-class WM_OT_SetupPaths(bpy.types.Operator):
+class SetupPathsOperator(bpy.types.Operator):
     bl_idname = "wm.setup_paths"
     bl_label = "Setup Required Paths"
     bl_description = "Select the path to file/folder"
@@ -1068,7 +1068,7 @@ class WM_OT_SetupPaths(bpy.types.Operator):
                     row.label(text=name, icon='CHECKMARK')
 
 
-class WARFRAME_OT_ExperimentalMode(bpy.types.Operator):
+class ExperimentalModeOperator(bpy.types.Operator):
     bl_idname = "wm.experimental_mode"
     bl_label = "Auto Setup Mode"
     bl_description = "Import model and auto-setup materials from MaterialPath"
