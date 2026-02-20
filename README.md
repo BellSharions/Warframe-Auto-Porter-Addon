@@ -1,7 +1,7 @@
 ## Auto Porter Blender Addon
 
 A Blender addon that simplifies some of the tedium and repetitive manual setup when porting assets.  
-Tested on Blender 4.1–4.4.
+Tested on Blender 4.1—4.4.
 
 ![Addon Preview](images/Preview.png)
 
@@ -10,9 +10,9 @@ Tested on Blender 4.1–4.4.
 2. In Blender (`Edit > Preferences > Add-ons`):
    - Click **Install from Disk…** and select the downloaded `.zip` archive
 3. In the same Preferences page, set:
-   - **Extracted Root Folder Path** – where your assets are extracted (folder that contains `Lotus`, `EE`, etc.)
-   - **Rig Blend Path** – default rig `.blend` file (optional)
-   - **Texture Extension** – default extracted texture format (`*.png` or `*.tga`)
+   - **Extracted Root Folder Path** — where your assets are extracted (folder that contains `Lotus`, `EE`, etc.)
+   - **Rig Blend Path** — default rig `.blend` file (optional)
+   - **Texture Extension** — default extracted texture format (`*.png` or `*.tga`)
 
 ### Accessing the addon
 - Open the 3D Viewport
@@ -84,8 +84,8 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 ### 2. Import Model
 
 **Key options**
-- **Import Level** – enable for levels; creates collections per material, hides “hidden” meshes and doesn't do the whole merge by distance thing, since this needs to be done manually for each mesh to spot mistakes(I think that's still something to look out for?).
-- **Use Extractor** – useless option at this stage. Might get a use later. No difference if enabled/disabled.
+- **Import Level** — enable for levels; creates collections per material, hides unneccessary meshes and doesn't do the whole merge by distance thing, since this needs to be done manually for each mesh to spot mistakes(I think that's still something to look out for?).
+- **Use Extractor** — useless option at this stage. Might get a use later. No difference if enabled/disabled.
 
 **Steps**
 1. Set **Mode** to **Import Model**.
@@ -93,7 +93,7 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 3. The addon will:
    - Import the `.glb` file
    - Fix model faces, remove doubles and apply smooth shading (for non‑level imports)
-   - Optionally group level meshes into collections per material and hide “hidden” meshes if the option to import a level is selected.
+   - Optionally group level meshes into collections per material and hide some unnecessary meshes if the option to import a level is selected.
 
 > You can then use **Append Shader** and **Setup Shader** on the imported meshes.
 
@@ -124,10 +124,10 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 2. Set **Mode** to **Shader Setup**.
 3. Choose type of file structure you have.
 4. Decide on behavior:
-   - **Empty Images Before Setup** – clear existing images from shader inputs before applying new textures
-   - **Replace Images** – allow replacing already assigned textures
-   - **Reset Parameters** – reset parameters that are not present in the TXT to the predefined ones or 0's
-   - **Texture Extension** – ensure it matches your texture files (`*.png` / `*.tga`)
+   - **Empty Images Before Setup** — clear existing images from shader inputs before applying new textures
+   - **Replace Images** — allow replacing already assigned textures
+   - **Reset Parameters** — reset parameters that are not present in the TXT to the predefined ones or 0's
+   - **Texture Extension** — ensure it matches your texture files (`*.png` / `*.tga`)
 6. Click **Run Setup**.
 7. The addon will:
    - Parse the material TXT into parameters and textures to set
@@ -147,7 +147,7 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 1. Set **Mode** to **Append Rig**.
 2. Provide the rig source.
 3. In your scene, select all meshes that should be controlled by the rig:  
-   Body, head, cloth, accessories, eyes, etc. **Do not** select any existing armatures – only meshes.
+   Body, head, cloth, accessories, eyes, etc. **Do not** select any existing armatures — only meshes.
 4. Click **Run Setup** → pick the desired rig from the list.
 5. The addon will:
    - Append the rig collection and the `Bones Snap` text script(if using Pruu's rigs)
@@ -161,11 +161,11 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 ### 6. Baking
 
 **Key options**
-- **Bake Sources** – toggles for: Base Color, Emission, Metalness, Roughness, Specular, Normal, Alpha
-- **Bake All Material Users** – bake all objects that share the active material, not just the active object
-- **UV Map Selection** – chooses which UV map to bake from
-- **Height / Width** – output texture resolution
-- **Bake Output Path** – where baked PNGs are saved; if empty, a `BakedTextures` folder next to the `.blend` is used. If the file is unsaved... **Pray**.
+- **Bake Sources** — toggles for: Base Color, Emission, Metalness, Roughness, Specular, Normal, Alpha
+- **Bake All Material Users** — bake all objects that share the active material, not just the active object
+- **UV Map Selection** — chooses which UV map to bake from
+- **Height / Width** — output texture resolution
+- **Bake Output Path** — where baked PNGs are saved; if empty, a `BakedTextures` folder next to the `.blend` is used. If the file is unsaved... **Pray**.
 
 **Steps**
 1. Select the object whose material you want to bake (or one of the objects sharing the material). Selecting multiple objects will cycle through them in the process of baking.
@@ -185,11 +185,11 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 ### 7. 3D Printing
 
 **Key options**
-- **Separate Stages** – when enabled, each step (normal→height, subdivision, deform) can be run separately; otherwise a combined “Run All” operator is available.
-- **Normal Map Path / Invert Green** – source normal map and whether to flip the green channel. Leave **Invert Green** option as is, it was used as a temporary test because I got curious...
-- **Subdivision Mode** - use a split Simple + Catmull‑Clark subdivision or only Catmull‑Clark. Models react differently depending on the mode, some look better in one, but wrong in the other. Click around to find out the best way.
-- **RAM‑based Subdivision** – automatically decide subdivision level based on available RAM if you're unsure on the amount of subdivisions. Rough estimations, but should be good enough for most.
-- **Height Map** – baked height image to use for displacement. Assumes you already converted normal map to height map. Doesn't appear unless **Separate Stages** is selected.
+- **Separate Stages** — when enabled, each step (normal→height, subdivision, deform) can be run separately; otherwise a combined “Run All” operator is available.
+- **Normal Map Path / Invert Green** — source normal map and whether to flip the green channel. Leave **Invert Green** option as is, it was used as a temporary test because I got curious...
+- **Subdivision Mode** — use a split Simple + Catmull‑Clark subdivision or only Catmull‑Clark. Models react differently depending on the mode, some look better in one, but wrong in the other. Click around to find out the best way.
+- **RAM‑based Subdivision** — automatically decide subdivision level based on available RAM if you're unsure on the amount of subdivisions. Rough estimations, but should be good enough for most.
+- **Height Map** — baked height image to use for displacement. Assumes you already converted normal map to height map. Doesn't appear unless **Separate Stages** is selected.
 
 **Steps**
   1. Set **Mode** to **3D Print** and leave **Separate Stages** disabled.  
@@ -213,7 +213,7 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
   - If using the extractor, verify **Extractor CLI Path** and **Cache Folder Path** are correct and that the CLI runs without errors by checking logs.
 
 - **Material Issues (wrong colors, parameters, etc.)**    
-  - Make sure you picked an appropriate shader from your shader library – see the material `.txt` file to determine which one you need.
+  - Make sure you picked an appropriate shader from your shader library — see the material `.txt` file to determine which one you need.
 
 - **Rig problems**  
   - Ensure only meshes (no armatures) are selected before running the rig setup.  
