@@ -73,11 +73,11 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
    - (If requested) Pick **Root**, **Extractor CLI** and **Cache Folder**
 3. Wait for processing. The addon will:
    - Import the model
-   - For each material, resolve the matching material TXT
-   - If the TXT is missing and **Use Extractor** is enabled, call the extractor to get it
-   - Parse the TXT and find the correct shader from your shader library
+   - For each material, resolve the matching material `.txt`
+   - If the `.txt` is missing and **Use Extractor** is enabled, call the extractor to get it
+   - Parse the `.txt` and find the correct shader from your shader library
    - Append the chosen shader material
-   - Connect textures and parameters (including Geometry Nodes) from the material TXT
+   - Connect textures and parameters (including Geometry Nodes) from the material `.txt`
 
 ---
 
@@ -126,11 +126,11 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 4. Decide on behavior:
    - **Empty Images Before Setup** — clear existing images from shader inputs before applying new textures
    - **Replace Images** — allow replacing already assigned textures
-   - **Reset Parameters** — reset parameters that are not present in the TXT to the predefined ones or 0's
+   - **Reset Parameters** — reset parameters that are not present in the `.txt` to the predefined ones or 0's
    - **Texture Extension** — ensure it matches your texture files (`*.png` / `*.tga`)
 6. Click **Run Setup**.
 7. The addon will:
-   - Parse the material TXT into parameters and textures to set
+   - Parse the material `.txt` into parameters and textures to set
    - Resolve texture file locations (either from root structure or custom folder)
    - Optionally call the extractor for missing textures when **Use Extractor** is enabled
    - Apply textures to the Texture nodes, setting color spaces based on context
@@ -226,6 +226,6 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 
 For issues/bugs:  
 [Open GitHub Issue](https://github.com/BellSharions/Warframe-Auto-Porter-Addon/issues)  
-**Include:** Blender version, addon version, error logs, OS, and (if possible) small example GLB/material TXT/shader/blender files.
+**Include:** Blender version, addon version, error logs, OS, and (if possible) small example GLB/material `.txt`/shader/blender files.
 
 
