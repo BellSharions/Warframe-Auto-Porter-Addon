@@ -68,6 +68,16 @@ special_reset_rules = {
     'MakeUpMask Y': 1,
     'MakeUpMask Z': 1,
     'MakeUpMask W': 1,
+    'RoughnessAtten': 1,
+    'ViewExtents W': -1,
+    'ViewExtents Z': 0,
+    'SSSFactor': 1,
+    'BoostMetallic': 0,
+    'IOR Boost': 0.5,
+    'ExposureVerctor': 0.660,
+    'ClearCoat IOR': 1.5,
+    'ClearCoat Power': 3.0,
+    'LightingBuffer': tuple([1, 1, 1, 1]),
 }
 
 special_aliases = {

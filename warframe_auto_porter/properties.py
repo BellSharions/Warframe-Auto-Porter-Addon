@@ -257,17 +257,22 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
         subtype='DIR_PATH',
         default=""
     )
+    bake_output_path: bpy.props.StringProperty(
+    name="Bake Output",
+    subtype='DIR_PATH',
+    default=""
+    )
     mode: EnumProperty(
         name="Mode",
         description="Choose what to do",
         items=[
+            ('EXPERIMENTAL', 'Auto Setup', 'Auto Setup mode'),
             ('IMPORT', 'Import Model', 'Import model from file'),
             ('APPEND', 'Append Shader', 'Append shader from file'),
             ('SHADER', 'Setup Shader', 'Setup shader with material file'),
-            ('EXPERIMENTAL', 'Auto Setup', 'Auto Setup mode'),
             ('RIG', 'Append Rig', 'Append rig from file'),
             ('BAKE', 'Bake Textures', 'Bake textures from active material'),
             ('3DPRINT', '3D Print', '3D Print operations'),
         ],
-        default='IMPORT'
+        default='EXPERIMENTAL'
     )

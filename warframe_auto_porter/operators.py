@@ -29,7 +29,8 @@ def setup_bake(context, source):
     """Prepare baking for a specific source"""
     material = context.active_object.active_material
     node_tree = material.node_tree
-
+    if source == "Specular":
+        source = "Specular IOR Level"
     output_node = next((n for n in node_tree.nodes if n.type == 'OUTPUT_MATERIAL'), None)
     if not output_node:
         raise Exception("Material Output node not found")
@@ -41,7 +42,7 @@ def setup_bake(context, source):
     for node in node_tree.nodes:
         if node.type in {'GROUP', 'GROUP_OUTPUT'}:
             for output in node.outputs:
-                if source in output.name:
+                if source == output.name:
                     fallback_socket = output
                     if source == "Normal" and "final" in getattr(node.node_tree, 'name', '').lower():
                         continue
@@ -60,7 +61,10 @@ def setup_bake(context, source):
     if not source_socket:
         raise Exception(f"Output socket '{source}' not found")
     bake_all_users = context.scene.warframe_tools_props.bake_all_material_users
-    image_name = f"{material.name}_{source.replace(' ', '')}"
+
+    if source == "Specular IOR Level":
+        source = "Specular"
+    image_name = f"{material.name}_{source.replace(' ', '')}.png"
     image = bpy.data.images.get(image_name)
     if image is None:
         image = bpy.data.images.new(image_name, *(bpy.context.scene.warframe_tools_props.bake_width, bpy.context.scene.warframe_tools_props.bake_height))
@@ -154,12 +158,17 @@ class OBJECT_OT_CreateBakedMaterial(bpy.types.Operator):
             self.report({'ERROR'}, "No active mesh object selected")
             return {'CANCELLED'}
 
-        material = obj.active_material
-        if not material:
+        original_material = obj.active_material
+        if not original_material:
             self.report({'ERROR'}, "Object has no active material")
             return {'CANCELLED'}
 
-        node_tree = material.node_tree
+        orig_name = original_material.name
+        new_mat_name = orig_name + "_Baked"
+
+        new_material = bpy.data.materials.new(new_mat_name)
+        new_material.use_nodes = True
+        node_tree = new_material.node_tree
 
         for node in node_tree.nodes:
             node_tree.nodes.remove(node)
@@ -180,18 +189,21 @@ class OBJECT_OT_CreateBakedMaterial(bpy.types.Operator):
             'Alpha': ('Alpha', 'VALUE')
         }
 
-        material_name = material.name
         for image in bpy.data.images:
-            if not image.name.startswith(f"{material_name}_"):
+            if not image.name.startswith(f"{orig_name}_"):
                 continue
 
-            suffix = image.name[len(f"{material_name}_"):]
+            suffix = image.name[len(f"{orig_name}_"):].split('.')[0]
 
             if suffix in texture_mappings:
                 input_name, input_type = texture_mappings[suffix]
                 tex_node = node_tree.nodes.new('ShaderNodeTexImage')
+                print(f"Before: {image.name}, source={image.source}, packed={image.packed_file is not None}, filepath={image.filepath}")
                 tex_node.image = image
-                tex_node.location = (-300, 200 * len(node_tree.nodes))
+                print(f"After: {image.name}, source={image.source}, packed={image.packed_file is not None}")
+                image.update()
+                tex_node.location = (-300, -200 * len(node_tree.nodes))
+
                 if input_type == 'COLOR':
                     node_tree.links.new(tex_node.outputs['Color'], principled.inputs[input_name])
                 elif input_type == 'VALUE':
@@ -207,8 +219,17 @@ class OBJECT_OT_CreateBakedMaterial(bpy.types.Operator):
                 else:
                     image.colorspace_settings.name = 'Non-Color'
 
-        principled.inputs["Emission Strength"].default_value = int(1)
-        self.report({'INFO'}, f"Created material '{material.name}' with baked textures")
+                print(f"After: {image.name}, source={image.source}, packed={image.packed_file is not None}")
+
+        principled.inputs["Emission Strength"].default_value = 1.0
+
+        for ob in bpy.data.objects:
+            if hasattr(ob, 'material_slots'):
+                for slot in ob.material_slots:
+                    if slot.material == original_material:
+                        slot.material = new_material
+
+        self.report({'INFO'}, f"Created material '{new_material.name}'")
         return {'FINISHED'}
 
 
@@ -267,6 +288,11 @@ class OBJECT_OT_BakeTextures(bpy.types.Operator):
 
             cleanup_bake(self.bake_state)
             print(f"Baked {self.sources[self.current_index]} for {self.objects_to_bake[self.current_object_index].name} complete!")
+            if self.bake_state and self.bake_state.image_node and self.bake_state.image_node.image:
+                image = self.bake_state.image_node.image
+                source = self.sources[self.current_index]
+                material_name = self.bake_state.material.name
+                self.save_baked_image(context, image, source, material_name)
             self.current_index += 1
             self.baking = False
 
@@ -298,6 +324,36 @@ class OBJECT_OT_BakeTextures(bpy.types.Operator):
         except Exception as e:
             self.report({'ERROR'}, f"Bake failed: {str(e)}")
             self.current_index = len(self.sources)
+
+    def save_baked_image(self, context, image, source, material_name):
+        props = context.scene.warframe_tools_props
+        output_dir = getattr(props, 'bake_output_path', '')
+
+        if not output_dir:
+            blend_path = bpy.data.filepath
+            if blend_path:
+                output_dir = os.path.join(os.path.dirname(blend_path), "BakedTextures")
+            else:
+                self.report({'WARNING'}, "No output directory and unsaved blend – image not saved")
+                return
+
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+        except Exception as e:
+            self.report({'ERROR'}, f"Cannot create output directory: {e}")
+            return
+
+        safe_source = source.replace(' ', '_')
+        filename = f"{material_name}_{safe_source}.png"
+        filepath = os.path.join(output_dir, filename)
+
+        try:
+            image.filepath_raw = filepath
+            image.file_format = 'PNG'
+            image.save()
+            self.report({'INFO'}, f"Saved: {filepath}")
+        except Exception as e:
+            self.report({'ERROR'}, f"Save failed: {e}")
 
 
 class NormalToHeightOperator(bpy.types.Operator):

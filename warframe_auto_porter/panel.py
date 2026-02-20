@@ -76,6 +76,9 @@ class WARFRAME_PT_SetupPanel(bpy.types.Panel):
             row.prop(props, "bake_height")
             row.prop(props, "bake_width")
             box.separator()
+            box.label(text="Set the output path before running the setup")
+            box.prop(props, "bake_output_path")
+            box.separator()
             box.operator("object.create_baked_material", text="Create Material With Baked Textures")
             if props.USE_PATHS:
                 layout.operator("wm.setup_paths", text="Run Setup")
