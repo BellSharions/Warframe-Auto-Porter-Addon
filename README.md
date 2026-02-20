@@ -27,7 +27,7 @@ The main **Mode** selector controls what the **Run Setup** button does.
 Available modes (current default is **Auto Setup**):
 
 - **Auto Setup**  
-  Full setup: import model -> locate material `.txt` file -> pick shader from library -> set up textures & parameters automatically.
+  Full setup: import model → locate material `.txt` file → pick shader from library → set up textures & parameters automatically.
 
 - **Import Model**  
   Import GLB models with Warframe‑specific fixes (normals, doubles, level layout).
@@ -45,7 +45,7 @@ Available modes (current default is **Auto Setup**):
   Bake selected channels (Base Color, Metalness, Roughness, Specular, Normal, Alpha, Emission) and save them to disk.
 
 - **3D Print**  
-  Utilities for normal->height conversion, subdivision setup and displacement‑based deformation for printing.
+  Utilities for normal→height conversion, subdivision setup and displacement‑based deformation for printing.
 
 ---
 
@@ -148,7 +148,7 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 2. Provide the rig source.
 3. In your scene, select all meshes that should be controlled by the rig:  
    Body, head, cloth, accessories, eyes, etc. **Do not** select any existing armatures – only meshes.
-4. Click **Run Setup** -> pick the desired rig from the list.
+4. Click **Run Setup** → pick the desired rig from the list.
 5. The addon will:
    - Append the rig collection and the `Bones Snap` text script(if using Pruu's rigs)
    - Change existing armature modifiers to the new rig
@@ -185,7 +185,7 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 ### 7. 3D Printing
 
 **Key options**
-- **Separate Stages** – when enabled, each step (normal->height, subdivision, deform) can be run separately; otherwise a combined “Run All” operator is available.
+- **Separate Stages** – when enabled, each step (normal→height, subdivision, deform) can be run separately; otherwise a combined “Run All” operator is available.
 - **Normal Map Path / Invert Green** – source normal map and whether to flip the green channel. Leave **Invert Green** option as is, it was used as a temporary test because I got curious...
 - **Subdivision Mode** - use a split Simple + Catmull‑Clark subdivision or only Catmull‑Clark. Models react differently depending on the mode, some look better in one, but wrong in the other. Click around to find out the best way.
 - **RAM‑based Subdivision** – automatically decide subdivision level based on available RAM if you're unsure on the amount of subdivisions. Rough estimations, but should be good enough for most.
