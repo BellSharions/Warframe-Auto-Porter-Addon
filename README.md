@@ -39,7 +39,7 @@ Available modes (current default is **Auto Setup**):
   Configure the active material from a Warframe material `.txt` file (manual / semi‑automatic variant of Auto Setup).
 
 - **Append Rig**  
-  Append a rig from a rig `.blend` file and re‑wire existing armature modifiers; supports special Face/Long Arm rigs.
+  Append a rig from a rig `.blend` file. Supports limited number of unique armature types defined in the file.
 
 - **Bake Textures**  
   Bake selected channels (Base Color, Metalness, Roughness, Specular, Normal, Alpha, Emission) and save them to disk.
@@ -139,10 +139,6 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 
 ### 5. Rig appending
 
-**Typical use cases**
-- Rigging characters with a prepared rig file (e.g. Warframe, Enemy)
-- Using special rigs like Face Rig or Long Arm Rig that require extra setup
-
 **Steps**
 1. Set **Mode** to **Append Rig**.
 2. Provide the rig source.
@@ -151,8 +147,8 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 4. Click **Run Setup** → pick the desired rig from the list.
 5. The addon will:
    - Append the rig collection and the `Bones Snap` text script(if using Pruu's rigs)
-   - Change existing armature modifiers to the new rig
-   - For special rigs (e.g. **Face Rig**, **Long Arm Rig**), run the Bone Snap script
+   - Change armature modifiers to the new rig
+   - For some rigs (e.g. **Face Rig**, **Long Arm Rig**), run the Bone Snap script
 
 > For details about which rig to pick, read the README inside your rig `.blend` file.
 
@@ -178,7 +174,7 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
    - Optionally iterate through all objects using the same material
    - Save each baked image as `<MaterialName>_<Channel>.png` into the chosen folder
 
->You can also click **Create Material With Baked Textures** to generate a clean Principled BSDF material wired to the baked maps and applied wherever the original material was used. **USE THIS OPTION AFTER BAKING ALL THE CHANNELS**.
+>You can also click **Create Material With Baked Textures** to generate a Principled BSDF material with the baked maps already connected and applied wherever the original material was used. **USE THIS OPTION AFTER BAKING ALL THE CHANNELS**.
 
 ---
 
@@ -214,6 +210,7 @@ With **Enable automatic paths** set to **True**, the addon will guide you throug
 
 - **Material Issues (wrong colors, parameters, etc.)**    
   - Make sure you picked an appropriate shader from your shader library — see the material `.txt` file to determine which one you need.
+  - Pray that recent patch havent broken materials or added new unsupported settings which give wrong result.
 
 - **Rig problems**  
   - Ensure only meshes (no armatures) are selected before running the rig setup.  
