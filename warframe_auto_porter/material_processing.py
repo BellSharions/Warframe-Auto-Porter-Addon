@@ -171,29 +171,25 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                     if any(containstexture(tex_name, input_socket.name) for link in input_socket.links):
                         try:
                             img = None
-                            for img_tex in bpy.data.images:
-                                if(img_tex.name == name):
-                                    img = img_tex
-                            if(img is None):
-                                if not os.path.exists(filename) and bpy.context.scene.warframe_tools_props.USE_EXTRACTOR:
-                                    props = bpy.context.scene.warframe_tools_props
+                            if not os.path.exists(filename) and bpy.context.scene.warframe_tools_props.USE_EXTRACTOR:
+                                props = bpy.context.scene.warframe_tools_props
 
-                                    internal_path = find_internal_texture_path(preextfilename)
-                                    texture_format = props.texture_extension.replace('*.', '').upper()
+                                internal_path = find_internal_texture_path(preextfilename)
+                                texture_format = props.texture_extension.replace('*.', '').upper()
 
-                                    success = extract_texture_with_cli(
-                                        props.extractor_path,
-                                        props.cache_path,
-                                        texture_format,
-                                        internal_path,
-                                        props.root
-                                    )
-                                    if success:
-                                        img = bpy.data.images.load(filename)
-                                    else:
-                                        print(f"Could not extract texture: {filename}")
+                                success = extract_texture_with_cli(
+                                    props.extractor_path,
+                                    props.cache_path,
+                                    texture_format,
+                                    internal_path,
+                                    props.root
+                                )
+                                if success:
+                                    img = bpy.data.images.load(filename, check_existing=True)
                                 else:
-                                    img = bpy.data.images.load(filename)
+                                    print(f"Could not extract texture: {filename}")
+                            else:
+                                img = bpy.data.images.load(filename, check_existing=True)
                             if '(sRGB)' in input_socket.name:
                                 img.colorspace_settings.name = 'sRGB'
                             else:
