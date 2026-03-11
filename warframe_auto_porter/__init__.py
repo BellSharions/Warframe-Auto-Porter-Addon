@@ -1,3 +1,13 @@
+bl_info = {
+    "name": "Warframe Auto Porter",
+    "author": "Bell Sharions",
+    "version": (0, 50, 1),
+    "blender": (4, 2, 0),
+    "location": "3D View > Tool Shelf (Right Panel) > Tool",
+    "description": "Imports and configures Warframe models/materials",
+    "category": "Import",
+}
+
 # Script done by Bell Sharions for Warframe Model Resources
 # This is not a "do it all" script, some assebly and tweaks might be required in some cases
 
