@@ -99,7 +99,8 @@ def connect_geometry_node_parameters(node_group_map, parameters, shader_data_fil
                                     value = tuple(float(v) for v in value[:3])
                                 else:
                                     value = (float(value), float(value), float(value))
-
+                            if value is None:
+                                continue
                             mod[item.identifier] = value
                             print(f"Setting geometry node parameter: {socket_name} = {value}")
                         elif should_reset:
