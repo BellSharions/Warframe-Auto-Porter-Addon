@@ -351,7 +351,7 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
             main_shader_name = path_parts[-2]
             shader_data_filtered[main_shader_name] = shader_data[shader_path]
 
-    connect_geometry_node_parameters(node_group_map, parameters, shader_data_filtered)
+    ##connect_geometry_node_parameters(node_group_map, parameters, shader_data_filtered)
     print(parameters)
     for node in node_groups:
         if node.type is not 'GEOMETRY':
