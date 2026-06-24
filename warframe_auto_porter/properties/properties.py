@@ -1,23 +1,23 @@
 import bpy
 from bpy.props import StringProperty, BoolProperty, PointerProperty, EnumProperty, IntProperty, CollectionProperty
 
-from .constants import texture_extension_list
+from ..constants import texture_extension_list
 
 
 def get_root_value(self):
-    return bpy.context.preferences.addons[__package__].preferences.root_preference
+    return bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.root_preference
 
 
 def set_root_value(self, value):
-    bpy.context.preferences.addons[__package__].preferences.root_preference = value
+    bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.root_preference = value
 
 
 def get_rig_value(self):
-    return bpy.context.preferences.addons[__package__].preferences.rig_preference
+    return bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.rig_preference
 
 
 def set_rig_value(self, value):
-    bpy.context.preferences.addons[__package__].preferences.rig_preference = value
+    bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.rig_preference = value
 
 
 def set_uv_value(self, value):
@@ -46,13 +46,32 @@ def get_uv_value(self):
 
 
 def get_ext_value(self):
-    val = bpy.context.preferences.addons[__package__].preferences.texture_extension_preference
+    val = bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.texture_extension_preference
     index = next((i for i, (first, *_) in enumerate(texture_extension_list) if first == val), None)
     return index
 
 
 def set_ext_value(self, value):
-    bpy.context.preferences.addons[__package__].preferences.texture_extension_preference = texture_extension_list[value][0]
+    bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.texture_extension_preference = texture_extension_list[value][0]
+
+
+def get_extractor_path(self):
+    return bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.extractor_path_preference
+
+def set_extractor_path(self, value):
+    bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.extractor_path_preference = value
+
+def get_cache_path(self):
+    return bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.cache_path_preference
+
+def set_cache_path(self, value):
+    bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.cache_path_preference = value
+
+def get_shader_library_path(self):
+    return bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.shader_library_path_preference
+
+def set_shader_library_path(self, value):
+    bpy.context.preferences.addons[__package__.rpartition('.')[0]].preferences.shader_library_path_preference = value
 
 
 def get_image_items(self, context):
@@ -101,7 +120,7 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
         default=True
     )
     invert_green: BoolProperty(
-        name="Invert green",
+        name="Normal Map is DirectX type",
         description="Inverts green or something, idk...",
         default=True
     )
@@ -170,14 +189,18 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
     extractor_path: StringProperty(
         name="Extractor CLI Path",
         description=r"Path to the CLI Extractor to use.",
-        default=r"D:\Extractor\Warframe-Extractor-CLI.exe",
-        subtype='FILE_PATH'
+        default="",
+        subtype='FILE_PATH',
+        get=get_extractor_path,
+        set=set_extractor_path
     )
     cache_path: StringProperty(
         name="Cache Folder Path",
         description=r"Path to the warframe cache folder (e.g., D:\Warframe\Cache.Windows)",
-        default=r"",
-        subtype='DIR_PATH'
+        default="",
+        subtype='DIR_PATH',
+        get=get_cache_path,
+        set=set_cache_path
     )
     material_file_path: StringProperty(
         name="Material File Path",
@@ -255,7 +278,9 @@ class WarframeAddonProperties(bpy.types.PropertyGroup):
         name="Shader Library Path",
         description="Path to the folder containing .blend files with shaders",
         subtype='DIR_PATH',
-        default=""
+        default="",
+        get=get_shader_library_path,
+        set=set_shader_library_path
     )
     bake_output_path: bpy.props.StringProperty(
     name="Bake Output",

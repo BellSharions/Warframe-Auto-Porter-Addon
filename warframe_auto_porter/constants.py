@@ -78,6 +78,16 @@ special_reset_rules = {
     'ClearCoat IOR': 1.5,
     'ClearCoat Power': 3.0,
     'LightingBuffer': tuple([1, 1, 1, 1]),
+    'DetailChannelStrength X': 1,
+    'DetailChannelStrength Y': 0,
+    'HairDetailsParams W': 1,
+    'FOG': tuple([0, 0, 0, 0]),
+    'Reflect Environment': 1,
+    'MacroUvScale': tuple([1, 1]),
+    'Jitter1 W': 1,
+    'Jitter1 Y': 59,
+    'Width': 1,
+    'Height': 1,
 }
 
 special_aliases = {
@@ -93,6 +103,10 @@ special_skips = {
     "cb0": "cb0",
     "windnoisemap": "windnoisemap",
     "windparams": "windparams",
+}
+
+special_skips_mat = {
+    "cb0": "cb0",
 }
 
 texture_ignores = [

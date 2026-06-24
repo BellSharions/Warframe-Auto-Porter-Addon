@@ -2,8 +2,11 @@ import bpy
 import os
 from pathlib import Path
 
-from .utils import set_default, reset_default, containstexture, find_internal_texture_path, extract_texture_with_cli
-from .constants import special_ignores, special_skips
+from ..utils.socket_utils import set_default, reset_default
+from ..utils.helpers import containstexture
+from ..utils.path_utils import find_internal_texture_path
+from ..utils.extraction import extract_texture_with_cli
+from ..constants import special_ignores, special_skips, special_skips_mat
 
 
 def connect_geometry_node_parameters(node_group_map, parameters, shader_data_filtered):
@@ -198,6 +201,7 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                             print(current.image)
                             if((current.image is None) or (bpy.context.scene.warframe_tools_props.REPLACE_IMAGES and current.image.name not in img.name)):
                                 current.image = img
+                                img.alpha_mode = 'CHANNEL_PACKED'
                                 print(f"Connected texture: {filename} to {input_socket.name} in {node_group.name}")
                             break
                         except Exception as e:
@@ -219,6 +223,8 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
             found_match = False
 
             lookup_name = input_lower
+            if any(value in lookup_name for value in special_skips_mat):
+                continue
             if '/' in input_name:
                 base_name, second_part = input_name.split("/", 1)
                 base_name_lower = base_name.lower()
@@ -276,7 +282,7 @@ def connect_textures_and_parameters(material, node_group, parameters, textures, 
                 reset_default(input_socket)
 
 
-def set_material_properties(material, material_data, pathToTextures, model_path, texture_locations, shader_data, hiearchy_data):
+def set_material_properties(material, material_data, pathToTextures, model_path, texture_locations, shader_data, hierarchy_data):
     parameters = {}
     textures = {}
     labeled_reroutes = []
@@ -325,6 +331,10 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
         if trigger_value.lower() in parameters.keys() and key_to_remove.lower() in parameters:
             del parameters[key_to_remove.lower()]
 
+    if material.node_tree is None:
+        print(f"Warning: Material '{material.name}' has no node tree, skipping")
+        return
+
     node_groups = []
     for node in material.node_tree.nodes:
         if node.type == 'REROUTE' and node.label.strip():
@@ -355,27 +365,4 @@ def set_material_properties(material, material_data, pathToTextures, model_path,
     print(parameters)
     for node in node_groups:
         if node.type is not 'GEOMETRY':
-            connect_textures_and_parameters(material, node, parameters, textures, pathToTextures, texture_locations, labeled_reroutes, shader_data, hiearchy_data)
-
-
-def get_shader_items(self, context):
-    items = []
-    if not os.path.exists(bpy.context.scene.warframe_tools_props.pathToShader):
-        return items
-    with bpy.data.libraries.load(bpy.context.scene.warframe_tools_props.pathToShader, link=False) as (data_from, data_to):
-        for mat_name in data_from.materials:
-            if "dots stroke" not in mat_name.lower():
-                items.append((mat_name, mat_name, ""))
-    return items
-
-
-def get_rig_items(self, context):
-    items = []
-    if not os.path.exists(bpy.context.scene.warframe_tools_props.rig_path):
-        return items
-    with bpy.data.libraries.load(bpy.context.scene.warframe_tools_props.rig_path, link=False) as (data_from, data_to):
-        for rig_name in data_from.collections:
-            print(rig_name)
-            if "meta" not in rig_name.lower() and "wgts" not in rig_name.lower():
-                items.append((rig_name, rig_name, ""))
-    return items
+            connect_textures_and_parameters(material, node, parameters, textures, pathToTextures, texture_locations, labeled_reroutes, shader_data, hierarchy_data)

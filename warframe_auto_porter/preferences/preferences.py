@@ -1,13 +1,11 @@
 import bpy
 from bpy.props import StringProperty, EnumProperty
 
-from .constants import texture_extension_list
+from ..constants import texture_extension_list
 
 
 class WarframeAutoPorter(bpy.types.AddonPreferences):
-    # This must match the add-on name, use `__package__`
-    # when defining this for add-on extensions or a sub-module of a python package.
-    bl_idname = __package__
+    bl_idname = __package__.rpartition('.')[0]
 
     root_preference: StringProperty(
         name="Extracted Root Folder Path",
@@ -23,6 +21,24 @@ class WarframeAutoPorter(bpy.types.AddonPreferences):
         items=texture_extension_list,
         default='*.png'
     )
+    extractor_path_preference: StringProperty(
+        name="Extractor CLI Path",
+        description=r"Path to the CLI Extractor to use.",
+        subtype='FILE_PATH',
+        default=""
+    )
+    cache_path_preference: StringProperty(
+        name="Cache Folder Path",
+        description=r"Path to the warframe cache folder (e.g., D:\Warframe\Cache.Windows)",
+        subtype='DIR_PATH',
+        default=""
+    )
+    shader_library_path_preference: StringProperty(
+        name="Shader Library Path",
+        description="Path to the folder containing .blend files with shaders",
+        subtype='DIR_PATH',
+        default=""
+    )
 
     def draw(self, context):
         layout = self.layout
@@ -34,3 +50,10 @@ class WarframeAutoPorter(bpy.types.AddonPreferences):
         layout.prop(self, "rig_preference")
         layout.label(text="Default extracted texture extension.")
         layout.prop(self, "texture_extension_preference")
+        layout.separator()
+        layout.label(text="Extractor CLI path (for auto-extraction of textures/materials)")
+        layout.prop(self, "extractor_path_preference")
+        layout.label(text="Warframe cache folder (e.g., D:\\Warframe\\Cache.Windows)")
+        layout.prop(self, "cache_path_preference")
+        layout.label(text="Folder containing .blend shader files")
+        layout.prop(self, "shader_library_path_preference")

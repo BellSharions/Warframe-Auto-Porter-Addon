@@ -15,7 +15,7 @@ class SetupPanelOperator(bpy.types.Panel):
         layout = self.layout
         scene = context.scene
         props = scene.warframe_tools_props
-        prefs = context.preferences.addons[__package__].preferences
+        prefs = context.preferences.addons[__package__.rpartition('.')[0]].preferences
         box = layout.box()
         box.label(text="Configuration")
         box.label(text="Select Mode:")
@@ -26,8 +26,8 @@ class SetupPanelOperator(bpy.types.Panel):
             box.prop(props, "USE_EXTRACTOR")
             if not props.USE_PATHS:
                 box.prop(props, "model_file_path")
-                box.prop(props, "extractor_path")
-                box.prop(props, "cache_path")
+                box.prop(prefs, "extractor_path_preference")
+                box.prop(prefs, "cache_path_preference")
 
             if props.USE_PATHS:
                 layout.operator("wm.setup_paths", text="Import")
@@ -123,9 +123,9 @@ class SetupPanelOperator(bpy.types.Panel):
             box.prop(props, "RESET_PARAMETERS")
             if not props.USE_PATHS:
                 box.prop(props, "model_file_path")
-                box.prop(props, "extractor_path")
-                box.prop(props, "cache_path")
-                box.prop(props, "shader_library_path")
+                box.prop(prefs, "extractor_path_preference")
+                box.prop(prefs, "cache_path_preference")
+                box.prop(prefs, "shader_library_path_preference")
             box.prop(props, "USE_ROOT_LOCATION")
             if not props.USE_PATHS and props.USE_ROOT_LOCATION:
                 box.prop(prefs, "root_preference")
@@ -141,8 +141,8 @@ class SetupPanelOperator(bpy.types.Panel):
             box.prop(props, "USE_EXTRACTOR")
             if not props.USE_PATHS:
                 box.prop(props, "material_file_path")
-                box.prop(props, "extractor_path")
-                box.prop(props, "cache_path")
+                box.prop(prefs, "extractor_path_preference")
+                box.prop(prefs, "cache_path_preference")
             box.prop(props, "USE_ROOT_LOCATION")
             if not props.USE_PATHS and not props.USE_ROOT_LOCATION: box.prop(props, "pathToTextures")
             elif not props.USE_PATHS and props.USE_ROOT_LOCATION: box.prop(prefs, "root_preference")
