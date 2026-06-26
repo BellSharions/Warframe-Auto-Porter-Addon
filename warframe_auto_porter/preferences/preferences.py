@@ -1,49 +1,45 @@
 import bpy
-from bpy.props import StringProperty, EnumProperty
+from bpy.props import EnumProperty, StringProperty
 
 from ..constants import texture_extension_list
 
 
 class WarframeAutoPorter(bpy.types.AddonPreferences):
-    bl_idname = __package__.rpartition('.')[0]
+    bl_idname = __package__.rpartition(".")[0]
 
-    root_preference: StringProperty(
-        name="Extracted Root Folder Path",
-        subtype='DIR_PATH'
-    )
-    rig_preference: StringProperty(
-        name="Rig Blend Path",
-        subtype='FILE_PATH'
-    )
+    root_preference: StringProperty(name="Extracted Root Folder Path", subtype="DIR_PATH")
+    rig_preference: StringProperty(name="Rig Blend Path", subtype="FILE_PATH")
     texture_extension_preference: EnumProperty(
         name="Texture Extension",
         description="Choose the texture file extension",
         items=texture_extension_list,
-        default='*.png'
+        default="*.png",
     )
     extractor_path_preference: StringProperty(
         name="Extractor CLI Path",
         description=r"Path to the CLI Extractor to use.",
-        subtype='FILE_PATH',
-        default=""
+        subtype="FILE_PATH",
+        default="",
     )
     cache_path_preference: StringProperty(
         name="Cache Folder Path",
         description=r"Path to the warframe cache folder (e.g., D:\Warframe\Cache.Windows)",
-        subtype='DIR_PATH',
-        default=""
+        subtype="DIR_PATH",
+        default="",
     )
     shader_library_path_preference: StringProperty(
         name="Shader Library Path",
         description="Path to the folder containing .blend files with shaders",
-        subtype='DIR_PATH',
-        default=""
+        subtype="DIR_PATH",
+        default="",
     )
 
     def draw(self, context):
         layout = self.layout
         layout.label(text="Warning! Changing these in the panel will change the preferences!")
-        layout.label(text="Path to the folder where Lotus, EE, DOS, SF and other folders are located.")
+        layout.label(
+            text="Path to the folder where Lotus, EE, DOS, SF and other folders are located."
+        )
         layout.label(text=r"DO NOT CHOOSE LOTUS FOLDER (example, D:\tmp\Assets)")
         layout.prop(self, "root_preference")
         layout.label(text=r"Path to the rig blend file (example, D:\Downloads\WF_Rig.blend)")

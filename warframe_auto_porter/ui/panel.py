@@ -5,9 +5,9 @@ class SetupPanelOperator(bpy.types.Panel):
     bl_label = "Warframe Model Setup"
     bl_idname = "SetupPanelOperator"
     bl_description = "Panel for setting up warframe models"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = 'Tool'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Tool"
 
     def draw(self, context):
         if not context:
@@ -15,12 +15,12 @@ class SetupPanelOperator(bpy.types.Panel):
         layout = self.layout
         scene = context.scene
         props = scene.warframe_tools_props
-        prefs = context.preferences.addons[__package__.rpartition('.')[0]].preferences
+        prefs = context.preferences.addons[__package__.rpartition(".")[0]].preferences
         box = layout.box()
         box.label(text="Configuration")
         box.label(text="Select Mode:")
         box.prop(props, "mode")
-        if props.mode == 'IMPORT':
+        if props.mode == "IMPORT":
             box.prop(props, "USE_PATHS")
             box.prop(props, "LEVEL_IMPORT")
             box.prop(props, "USE_EXTRACTOR")
@@ -34,7 +34,7 @@ class SetupPanelOperator(bpy.types.Panel):
             else:
                 layout.operator("wm.run_setup", text="Import")
             return
-        if props.mode == 'APPEND':
+        if props.mode == "APPEND":
             box.prop(props, "USE_PATHS")
             if not props.USE_PATHS:
                 box.prop(props, "pathToShader")
@@ -44,7 +44,7 @@ class SetupPanelOperator(bpy.types.Panel):
             else:
                 layout.operator("wm.run_setup", text="Run Setup")
             return
-        if props.mode == 'RIG':
+        if props.mode == "RIG":
             box.prop(props, "USE_PATHS")
             if not props.USE_PATHS:
                 box.prop(prefs, "rig_preference")
@@ -53,15 +53,11 @@ class SetupPanelOperator(bpy.types.Panel):
             else:
                 layout.operator("wm.run_setup", text="Run Setup")
             return
-        if props.mode == 'BAKE':
+        if props.mode == "BAKE":
             box.prop(props, "USE_PATHS")
             box.label(text="Bake Sources:")
             grid = box.grid_flow(
-                row_major=True,
-                columns=3,
-                even_columns=True,
-                even_rows=True,
-                align=True
+                row_major=True, columns=3, even_columns=True, even_rows=True, align=True
             )
             grid.prop(props, "bake_base_color")
             grid.prop(props, "bake_emission")
@@ -85,7 +81,7 @@ class SetupPanelOperator(bpy.types.Panel):
             else:
                 layout.operator("wm.run_setup", text="Run Setup")
             return
-        if props.mode == '3DPRINT':
+        if props.mode == "3DPRINT":
             box.prop(props, "separate_mode")
             convert = box.box()
             convert.prop(props, "normal_to_height_path")
@@ -110,13 +106,15 @@ class SetupPanelOperator(bpy.types.Panel):
             if props.separate_mode:
                 heightm = box.box()
                 heightm.prop(props, "image_select")
-                heightm.operator("dprint.add_height", text="Add Deform Modifier With Selected Height Map")
+                heightm.operator(
+                    "dprint.add_height", text="Add Deform Modifier With Selected Height Map"
+                )
 
             if not props.separate_mode:
                 row = box.row()
                 row.operator("dprint.run_all_operations", text="Run All Operations")
             return
-        if props.mode == 'EXPERIMENTAL':
+        if props.mode == "EXPERIMENTAL":
             box.prop(props, "USE_PATHS")
             box.prop(props, "USE_EXTRACTOR")
             box.prop(props, "LEVEL_IMPORT")
@@ -135,7 +133,7 @@ class SetupPanelOperator(bpy.types.Panel):
             else:
                 layout.operator("wm.run_setup", text="Run Auto Setup")
             return
-        if props.mode == 'SHADER':
+        if props.mode == "SHADER":
             box.prop(props, "USE_PATHS")
 
             box.prop(props, "USE_EXTRACTOR")
@@ -144,8 +142,10 @@ class SetupPanelOperator(bpy.types.Panel):
                 box.prop(prefs, "extractor_path_preference")
                 box.prop(prefs, "cache_path_preference")
             box.prop(props, "USE_ROOT_LOCATION")
-            if not props.USE_PATHS and not props.USE_ROOT_LOCATION: box.prop(props, "pathToTextures")
-            elif not props.USE_PATHS and props.USE_ROOT_LOCATION: box.prop(prefs, "root_preference")
+            if not props.USE_PATHS and not props.USE_ROOT_LOCATION:
+                box.prop(props, "pathToTextures")
+            elif not props.USE_PATHS and props.USE_ROOT_LOCATION:
+                box.prop(prefs, "root_preference")
             box.prop(props, "EMPTY_IMAGES_BEFORE_SETUP")
             box.prop(props, "REPLACE_IMAGES")
             box.prop(props, "RESET_PARAMETERS")

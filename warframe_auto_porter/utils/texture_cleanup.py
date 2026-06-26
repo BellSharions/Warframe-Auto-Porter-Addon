@@ -11,6 +11,6 @@ def cleanup_textures(operator, material, new_image_names):
         if image:
             try:
                 bpy.data.images.remove(image)
-                operator.report({'INFO'}, f"Removed unused image: {image_name}")
+                operator.report({"INFO"}, f"Removed unused image: {image_name}")
             except Exception as e:
-                operator.report({'WARNING'}, f"Could not remove image {image_name}: {str(e)}")
+                operator.report({"WARNING"}, f"Could not remove image {image_name}: {e!s}")

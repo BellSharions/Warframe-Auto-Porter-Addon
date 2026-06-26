@@ -3,18 +3,17 @@ import bpy
 
 
 def process_object(obj):
-    if obj.type != 'MESH':
+    if obj.type != "MESH":
         return
     me = obj.data
     if me.color_attributes:
-
         mesh = obj.data
         loops = mesh.loops
         polygons = mesh.polygons
 
         color_attr_names = []
         for att in mesh.color_attributes:
-            if att.domain == 'POINT':
+            if att.domain == "POINT":
                 color_attr_names.append(att.name)
 
         if not color_attr_names:
@@ -30,12 +29,10 @@ def process_object(obj):
 
             old_name = color_attr.name
             new_attr = mesh.color_attributes.new(
-                name=old_name,
-                type=color_attr.data_type,
-                domain='CORNER'
+                name=old_name, type=color_attr.data_type, domain="CORNER"
             )
             src_data = [0.0] * (len(mesh.vertices) * 4)
-            color_attr.data.foreach_get('color', src_data)
+            color_attr.data.foreach_get("color", src_data)
             dst_data = [0.0] * (len(loops) * 4)
             for poly in polygons:
                 for loop_idx in poly.loop_indices:
@@ -47,7 +44,7 @@ def process_object(obj):
                     dst_data[dst_idx + 2] = src_data[src_idx + 2]
                     dst_data[dst_idx + 3] = src_data[src_idx + 3]
 
-            new_attr.data.foreach_set('color', dst_data)
+            new_attr.data.foreach_set("color", dst_data)
             new_attr.data.update()
             mesh.color_attributes.remove(color_attr)
             new_attr.name = old_name

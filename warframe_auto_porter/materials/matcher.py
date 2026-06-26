@@ -1,12 +1,13 @@
 import os
 import re
+
 import bpy
 
 
 def find_shader_material(shader_name, shader_library_path):
     shader_files = {}
     for f in os.listdir(shader_library_path):
-        if f.endswith('.blend'):
+        if f.endswith(".blend"):
             shader_files[f.lower()] = f
 
     target_file = f"{shader_name}.blend"
@@ -23,9 +24,9 @@ def find_shader_material(shader_name, shader_library_path):
 
 def _should_exclude_material(mat_name):
     mat_lower = mat_name.lower()
-    if re.search(r'\bstroke\b', mat_lower):
+    if re.search(r"\bstroke\b", mat_lower):
         return True
-    if re.search(r'\bdev\b', mat_lower):
+    if re.search(r"\bdev\b", mat_lower):
         return True
     return False
 
@@ -98,7 +99,9 @@ def get_shader_items(self, context):
     items = []
     if not os.path.exists(bpy.context.scene.warframe_tools_props.pathToShader):
         return items
-    with bpy.data.libraries.load(bpy.context.scene.warframe_tools_props.pathToShader, link=False) as (data_from, data_to):
+    with bpy.data.libraries.load(
+        bpy.context.scene.warframe_tools_props.pathToShader, link=False
+    ) as (data_from, data_to):
         for mat_name in data_from.materials:
             if "dots stroke" not in mat_name.lower():
                 items.append((mat_name, mat_name, ""))
@@ -109,7 +112,10 @@ def get_rig_items(self, context):
     items = []
     if not os.path.exists(bpy.context.scene.warframe_tools_props.rig_path):
         return items
-    with bpy.data.libraries.load(bpy.context.scene.warframe_tools_props.rig_path, link=False) as (data_from, data_to):
+    with bpy.data.libraries.load(bpy.context.scene.warframe_tools_props.rig_path, link=False) as (
+        data_from,
+        data_to,
+    ):
         for rig_name in data_from.collections:
             print(rig_name)
             if "meta" not in rig_name.lower() and "wgts" not in rig_name.lower():
