@@ -90,6 +90,7 @@ special_reset_rules = {
     "Height": 1,
     "Fix Tangent": 1,
     "SkinToneMult": 1,
+    "SpecularMap sRGB": 1,
 }
 
 special_aliases = {

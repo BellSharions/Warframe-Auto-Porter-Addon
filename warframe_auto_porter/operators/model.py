@@ -163,7 +163,7 @@ class ExperimentalModeOperator(bpy.types.Operator):
             gn_node_groups = []
             try:
                 with bpy.data.libraries.load(
-                    context.scene.warframe_tools_props.pathToShader, link=False
+                    shader_blend_path, link=False
                 ) as (data_from, data_to):
                     gn_node_groups = [
                         name
@@ -178,7 +178,7 @@ class ExperimentalModeOperator(bpy.types.Operator):
                     try:
                         bpy.ops.wm.append(
                             directory=os.path.join(
-                                context.scene.warframe_tools_props.pathToShader, "NodeTree"
+                                shader_blend_path, "NodeTree"
                             )
                             + os.sep,
                             filename=node_group_name,
@@ -220,6 +220,7 @@ class ExperimentalModeOperator(bpy.types.Operator):
 
             model_path = find_internal_path(material_file_path)
             set_material_properties(
+                obj,
                 new_material,
                 material_data,
                 props.pathToTextures,

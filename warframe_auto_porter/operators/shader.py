@@ -150,6 +150,7 @@ class SetupShaderOperator(bpy.types.Operator):
         model_path = find_internal_path(props.material_file_path)
 
         set_material_properties(
+            context.object,
             mat,
             material_data,
             props.pathToTextures,

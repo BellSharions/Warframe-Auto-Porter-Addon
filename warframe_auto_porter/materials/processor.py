@@ -11,20 +11,20 @@ from ..utils.path_utils import find_internal_texture_path
 from ..utils.socket_utils import reset_default, set_default
 
 
-def connect_geometry_node_parameters(node_group_map, parameters, shader_data_filtered):
+def connect_geometry_node_parameters(obj, node_group_map, parameters, shader_data_filtered):
     for param_name, param_value in (parameters | shader_data_filtered).items():
         print(param_name)
         if param_name.lower() in node_group_map:
             ng = node_group_map[param_name.lower()]
 
             existing_mod = None
-            for mod in bpy.context.active_object.modifiers:
+            for mod in obj.modifiers:
                 if mod.type == "NODES" and mod.node_group == ng:
                     existing_mod = mod
                     break
 
             if existing_mod is None:
-                mod = bpy.context.active_object.modifiers.new(name=ng.name, type="NODES")
+                mod = obj.modifiers.new(name=ng.name, type="NODES")
                 mod.node_group = ng
             else:
                 mod = existing_mod
@@ -120,6 +120,13 @@ def connect_geometry_node_parameters(node_group_map, parameters, shader_data_fil
                                     value = tuple(float(v) for v in value[:3])
                                 else:
                                     value = (float(value), float(value), float(value))
+                            elif socket_type == "NodeSocketColor":
+                                if isinstance(value, (list, tuple)) and len(value) >= 4:
+                                    value = tuple(float(v) for v in value[:4])
+                                elif isinstance(value, (int, float)):
+                                    value = (float(value), float(value), float(value), 1.0)
+                                else:
+                                    value = (1.0, 1.0, 1.0, 1.0)
                             if value is None:
                                 continue
                             mod[item.identifier] = value
@@ -131,6 +138,8 @@ def connect_geometry_node_parameters(node_group_map, parameters, shader_data_fil
                                 mod[item.identifier] = 0
                             elif socket_type == "NodeSocketVector":
                                 mod[item.identifier] = (0.0, 0.0, 0.0)
+                            elif socket_type == "NodeSocketColor":
+                                mod[item.identifier] = (0.0, 0.0, 0.0, 0.0)
 
                     except Exception as e:
                         print(f"Exception processing geometry node {socket_name}: {e!s}")
@@ -330,6 +339,7 @@ def connect_textures_and_parameters(
 
 
 def set_material_properties(
+    obj,
     material,
     material_data,
     pathToTextures,
@@ -441,7 +451,7 @@ def set_material_properties(
             main_shader_name = path_parts[-2]
             shader_data_filtered[main_shader_name] = shader_data[shader_path]
 
-    ##connect_geometry_node_parameters(node_group_map, parameters, shader_data_filtered)
+    connect_geometry_node_parameters(obj, node_group_map, parameters, shader_data_filtered)
     print(parameters)
     for node in node_groups:
         if node.type != "GEOMETRY":
