@@ -37,6 +37,11 @@ def parse_material_file(filepath):
             try:
                 if value.startswith("[") and value.endswith("]"):
                     value = ast.literal_eval(value)
+                    if isinstance(value, list):
+                        value = [
+                            float(v) if isinstance(v, str) else v
+                            for v in value
+                        ]
                 else:
                     try:
                         value = float(value) if "." in value else int(value)

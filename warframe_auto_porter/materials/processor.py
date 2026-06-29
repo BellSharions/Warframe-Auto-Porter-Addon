@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 import bpy
@@ -383,7 +384,10 @@ def set_material_properties(
                     for f in os.listdir(str(Path(root_loc + value)))
                     if os.path.isfile(os.path.join(str(Path(root_loc + value)), f))
                 ]
-                for idx, file in enumerate(onlyfiles):
+                for file in onlyfiles:
+                    stem = Path(file).stem
+                    match = re.search(r'_(\d+)$', stem)
+                    idx = int(match.group(1)) if match else 0
                     texture_locations[key + " " + str(idx)] = str(Path(root_loc + value + file))
                 continue
             texture_locations[key] = str(Path(root_loc + value))

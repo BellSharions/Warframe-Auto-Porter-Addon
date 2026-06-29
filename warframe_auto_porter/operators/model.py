@@ -126,7 +126,7 @@ class ExperimentalModeOperator(bpy.types.Operator):
                 continue
 
             print(f"Found shader: {shader_blend_path}")
-            material_name = get_best_material_from_blend(shader_blend_path, material_data)
+            material_name = get_best_material_from_blend(shader_blend_path, material_data, shader_name)
             if not material_name:
                 self.report({"ERROR"}, f"No suitable material found in {shader_blend_path}")
                 set_up_mats.append(obj.data.materials[0].name.split(".")[0])

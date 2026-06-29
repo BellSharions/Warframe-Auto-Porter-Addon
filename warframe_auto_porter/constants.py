@@ -88,6 +88,8 @@ special_reset_rules = {
     "Jitter1 Y": 59,
     "Width": 1,
     "Height": 1,
+    "Fix Tangent": 1,
+    "SkinToneMult": 1,
 }
 
 special_aliases = {

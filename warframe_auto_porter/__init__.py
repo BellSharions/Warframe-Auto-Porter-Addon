@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Warframe Auto Porter",
     "author": "Bell Sharions",
-    "version": (0, 50, 21),
+    "version": (0, 50, 24),
     "blender": (4, 2, 0),
     "location": "3D View > Tool Shelf (Right Panel) > Tool",
     "description": "Imports and configures Warframe models/materials",

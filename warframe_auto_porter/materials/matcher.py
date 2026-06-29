@@ -31,12 +31,39 @@ def _should_exclude_material(mat_name):
     return False
 
 
-def get_best_material_from_blend(blend_path, params):
+def _filter_by_shader_bracket(materials, shader_name):
+    bracket_pattern = re.compile(r"\[(.+?)\]")
+    has_any_brackets = False
+    matched = []
+    unbracketed = []
+
+    for mat in materials:
+        m = bracket_pattern.search(mat)
+        if m:
+            has_any_brackets = True
+            if m.group(1).lower() == shader_name.lower():
+                matched.append(mat)
+        else:
+            unbracketed.append(mat)
+
+    if not has_any_brackets:
+        return materials
+
+    if matched:
+        return matched
+
+    return unbracketed
+
+
+def get_best_material_from_blend(blend_path, params, shader_name=None):
     materials = []
     with bpy.data.libraries.load(blend_path, link=False) as (data_from, data_to):
         for mat_name in data_from.materials:
             if not _should_exclude_material(mat_name):
                 materials.append(mat_name)
+
+    if shader_name is not None:
+        materials = _filter_by_shader_bracket(materials, shader_name)
 
     valid_params = set()
     for key, value in params.items():
