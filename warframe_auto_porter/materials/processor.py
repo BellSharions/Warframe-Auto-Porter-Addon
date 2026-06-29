@@ -126,7 +126,7 @@ def connect_geometry_node_parameters(obj, node_group_map, parameters, shader_dat
                                 elif isinstance(value, (int, float)):
                                     value = (float(value), float(value), float(value), 1.0)
                                 else:
-                                    value = (1.0, 1.0, 1.0, 1.0)
+                                    value = (0.5, 0.5, 0.5, 1.0)
                             if value is None:
                                 continue
                             mod[item.identifier] = value
@@ -137,9 +137,9 @@ def connect_geometry_node_parameters(obj, node_group_map, parameters, shader_dat
                             elif socket_type in ("NodeSocketInt", "NodeSocketFloat"):
                                 mod[item.identifier] = 0
                             elif socket_type == "NodeSocketVector":
-                                mod[item.identifier] = (0.0, 0.0, 0.0)
+                                mod[item.identifier] = (0.5, 0.5, 0.5)
                             elif socket_type == "NodeSocketColor":
-                                mod[item.identifier] = (0.0, 0.0, 0.0, 0.0)
+                                mod[item.identifier] = (0.5, 0.5, 0.5, 1.0)
 
                     except Exception as e:
                         print(f"Exception processing geometry node {socket_name}: {e!s}")
